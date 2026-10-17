@@ -3,6 +3,7 @@
   "short_name": "進捗ノート",
   "description": "担任助手用：受講・高マス・登校の予定と実績",
   "lang": "ja",
+  "id": "/seito-note/",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

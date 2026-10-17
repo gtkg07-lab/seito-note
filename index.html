@@ -1200,7 +1200,14 @@ function startData(fs){
   document.getElementById('logout').addEventListener('click',()=>{auth.signOut().then(()=>location.reload())});
 })();
 // ホーム画面アプリ：オフラインでも画面が開くように
-if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+if('serviceWorker' in navigator){
+  // 新しい版が届いたら一度だけ読み込み直す（Dock やホーム画面のアプリにもすぐ反映）
+  let reloaded=false;const hadCtl=!!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{if(hadCtl&&!reloaded){reloaded=true;location.reload()}});
+  window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>{
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')r.update().catch(()=>{})});
+  }).catch(()=>{}));
+}
 </script>
 </body>
 </html>
