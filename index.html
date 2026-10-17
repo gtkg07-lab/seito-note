@@ -1,0 +1,1195 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#2a4d9b">
+<meta name="robots" content="noindex,nofollow">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="進捗ノート">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>生徒進捗ノート</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: 上部に固定のタブ、その下にフィルタ、本文は生徒ごとの行カードと集計タイル。最大幅1120px */
+:root{
+  --bg:#f4f6fa; --surface:#ffffff; --sunk:#eef1f7;
+  --ink:#1b2233; --ink-2:#465068; --muted:#737c92; --line:#dde2ec;
+  --accent:#2a4d9b; --accent-ink:#ffffff; --accent-soft:#e5ebf8;
+  --good:#1d7a46; --good-soft:#e2f3e8; --bad:#b3342b; --bad-soft:#fbe7e4; --warn:#9a6200; --warn-soft:#fbf0d9;
+  --bar:#4a6fc4; --today-bg:#fff4d6; --today-ink:#b26a00;
+  --f-body:"BIZ UDPGothic","Hiragino Sans","Yu Gothic UI",system-ui,sans-serif;
+  --f-num:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#10131a; --surface:#181c26; --sunk:#1f2431;
+  --ink:#e6e9f1; --ink-2:#b4bbcb; --muted:#8a92a6; --line:#2b3242;
+  --accent:#8eaaf0; --accent-ink:#0f1730; --accent-soft:#223155;
+  --good:#5cc489; --good-soft:#173325; --bad:#f07c71; --bad-soft:#3a1d1b; --warn:#e3ab4c; --warn-soft:#352812;
+  --bar:#7d9de6; --today-bg:#3a2f12; --today-ink:#f2b84b; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#10131a; --surface:#181c26; --sunk:#1f2431;
+  --ink:#e6e9f1; --ink-2:#b4bbcb; --muted:#8a92a6; --line:#2b3242;
+  --accent:#8eaaf0; --accent-ink:#0f1730; --accent-soft:#223155;
+  --good:#5cc489; --good-soft:#173325; --bad:#f07c71; --bad-soft:#3a1d1b; --warn:#e3ab4c; --warn-soft:#352812;
+  --bar:#7d9de6; --today-bg:#3a2f12; --today-ink:#f2b84b; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.6}
+.wrap{max-width:1120px;margin:0 auto;padding-inline:16px;padding-block:0 48px}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.num{font-family:var(--f-num);font-variant-numeric:tabular-nums}
+
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+.bar1{display:flex;align-items:center;gap:12px;padding-block:12px 8px;flex-wrap:wrap}
+.brand{font-weight:700;font-size:17px;letter-spacing:.02em;display:flex;align-items:baseline;gap:8px}
+.brand small{font-weight:400;color:var(--muted);font-size:12px}
+.save{margin-left:auto;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.save i{width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block}
+.save.ok i{background:var(--good)} .save.busy i{background:var(--warn)} .save.err i{background:var(--bad)} .save.err{color:var(--bad)}
+nav.tabs{display:flex;gap:4px;overflow-x:auto;padding-bottom:8px;scrollbar-width:none}
+nav.tabs button{border:0;background:transparent;padding:8px 14px;border-radius:999px;white-space:nowrap;color:var(--ink-2);font-weight:700}
+nav.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accent-ink)}
+nav.tabs button:not([aria-selected="true"]):hover{background:var(--sunk)}
+
+.filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding-block:14px 4px}
+.chips{display:flex;gap:4px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--surface);padding:5px 12px;border-radius:999px;font-size:13px}
+.chip[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:700}
+.search{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 12px;min-width:0;width:180px}
+.fcount{font-size:12px;color:var(--muted)}
+
+.banner{margin-top:12px;padding:10px 14px;border-radius:var(--r);background:var(--warn-soft);color:var(--warn);font-size:13px}
+.banner.err{background:var(--bad-soft);color:var(--bad)}
+
+h2{font-size:18px;margin:22px 0 4px;text-wrap:balance}
+.lead{color:var(--ink-2);font-size:13px;margin:0 0 12px}
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0 14px}
+.toolbar .sep{flex:1}
+/* 日付の操作欄はスクロールしても上に残る（生徒の行はその下に隠れていく） */
+.toolbar.sticky{position:sticky;top:calc(env(safe-area-inset-top,0px) + var(--hh,96px));z-index:4;background:var(--bg);margin-inline:-16px;padding:8px 16px;border-bottom:1px solid var(--line);box-shadow:0 6px 8px -8px rgba(0,0,0,.25)}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:6px 12px;font-size:13px}
+.btn:hover{background:var(--sunk)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.ghost{border-color:transparent;background:transparent}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.date{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:5px 10px}
+.range{font-size:13px;color:var(--ink-2)}
+.totals{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--ink-2)}
+.totals b{color:var(--ink);font-family:var(--f-num);font-size:15px}
+
+/* 入力カード */
+.list{display:flex;flex-direction:column;gap:8px}
+.gradehead{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.08em;margin:10px 2px 0}
+.srow{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;display:grid;grid-template-columns:150px auto 1fr;gap:10px 16px;align-items:start}
+.who{display:flex;flex-direction:column;gap:2px;min-width:0}
+.who b{font-size:15px;overflow-wrap:anywhere}
+.grade{font-size:11px;color:var(--muted)}
+.grp{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;min-width:0}
+.cols{display:flex;flex-direction:column;gap:8px;min-width:0}
+.lbl{font-size:11px;font-weight:700;color:var(--muted);width:44px;flex:none}
+.step{display:inline-flex;align-items:center;gap:6px;background:var(--sunk);border-radius:8px;padding:3px 4px 3px 10px;min-width:0}
+.step .nm{font-size:12px;color:var(--ink-2);max-width:12em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.step button{width:28px;height:28px;border-radius:6px;border:1px solid var(--line);background:var(--surface);font-weight:700;line-height:1;padding:0}
+.step button:disabled{opacity:.35;cursor:not-allowed}
+.step output{min-width:1.6em;text-align:center;font-family:var(--f-num);font-weight:500}
+.step output.z{color:var(--muted)}
+.kgrp{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px;background:var(--sunk);border-radius:8px;padding:4px 6px 4px 10px;min-width:0}
+.kgrp .nm{font-size:12px;color:var(--ink-2);max-width:12em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kgrp small{font-size:11px;color:var(--muted);font-family:var(--f-num)}
+.kc{display:inline-flex;align-items:center;gap:4px;background:var(--accent-soft);color:var(--accent);border-radius:6px;padding:2px 2px 2px 8px;font-size:12px;white-space:nowrap}
+.kc b{color:var(--warn)}
+.kc button{border:0;background:transparent;color:inherit;width:22px;height:22px;border-radius:4px;padding:0;font-weight:700}
+.kc button:hover{background:var(--surface)}
+.ksel{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:4px 6px;font-size:12px;max-width:10.5em}
+.kadd{border:1px solid var(--accent);background:var(--surface);color:var(--accent);border-radius:6px;padding:4px 8px;font-size:12px;font-weight:700}
+.kadd:disabled,.ksel:disabled{opacity:.45;cursor:not-allowed}
+.step small{font-size:11px;color:var(--muted);font-family:var(--f-num);padding-right:6px}
+.att{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 12px;font-weight:700;color:var(--muted);white-space:nowrap}
+.att[aria-pressed="true"]{background:var(--good-soft);border-color:var(--good);color:var(--good)}
+.days7{display:flex;gap:4px;flex-wrap:wrap;align-items:flex-start}
+.dcell{display:flex;flex-direction:column;gap:3px}
+.pcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.phead{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.phead b{font-size:15px}
+.phead .totals{margin-left:auto;font-size:12px;gap:10px}
+.ptable{margin-top:0;border-radius:8px}
+.ptable th,.ptable td{padding:4px 5px;text-align:center}
+.ptable th.l,.ptable td.l{text-align:left;white-space:nowrap}
+.pn{width:46px;text-align:center;border:1px solid var(--line);border-radius:6px;padding:3px 2px;background:var(--bg);font-family:var(--f-num)}
+.pa{width:46px;border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:3px 0;color:var(--muted)}
+.pa[aria-pressed="true"]{background:var(--good-soft);border-color:var(--good);color:var(--good);font-weight:700}
+.pa:disabled,.pn:disabled{opacity:.5;cursor:not-allowed}
+.tm{width:100%;min-width:56px;font-size:12px;border:1px solid var(--good);border-radius:6px;padding:2px 4px;background:var(--surface);font-family:var(--f-num)}
+.days7 button{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:4px 6px;font-size:12px;min-width:56px}
+.days7 button[aria-pressed="true"]{background:var(--good-soft);border-color:var(--good);color:var(--good);font-weight:700}
+.final{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--warn);background:var(--warn-soft);padding:4px 8px;border-radius:6px}
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--good-soft);color:var(--good);white-space:nowrap}
+.badge.warn{background:var(--warn-soft);color:var(--warn)}
+.badge.bad{background:var(--bad-soft);color:var(--bad)}
+.none{font-size:12px;color:var(--muted)}
+
+/* 集計 */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.tile .k{font-size:12px;color:var(--ink-2);font-weight:700}
+.tile .v{font-family:var(--f-num);font-size:28px;line-height:1.15;font-variant-numeric:tabular-nums}
+.tile .v small{font-size:13px;color:var(--muted);font-family:var(--f-body);margin-left:4px}
+.tile .sub{font-size:12px;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap}
+.d{font-family:var(--f-num);font-weight:500;white-space:nowrap}
+.d.up{color:var(--good)} .d.down{color:var(--bad)} .d.flat{color:var(--muted)}
+.meter{height:6px;border-radius:3px;background:var(--sunk);overflow:hidden;margin-top:4px}
+.meter i{display:block;height:100%;background:var(--accent);border-radius:3px}
+.meter.hm i{background:var(--good)}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-top:12px}
+.panel h3{font-size:14px;margin:0 0 10px}
+.chart{display:grid;grid-template-columns:32px 1fr;gap:6px;height:190px}
+.yax{position:relative;font-size:11px;color:var(--muted);font-family:var(--f-num)}
+.yax span{position:absolute;right:0;transform:translateY(50%)}
+.plot{position:relative;display:flex;align-items:flex-end;gap:2px;border-bottom:1px solid var(--line)}
+.plot .grid{position:absolute;left:0;right:0;border-top:1px dashed var(--line)}
+.col{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;position:relative;min-width:0;cursor:default;outline:none}
+.col .b{width:min(42px,70%);background:var(--bar);border-radius:4px 4px 0 0;min-height:0}
+.col:hover .b,.col:focus .b{filter:brightness(1.12)}
+.col .lab{position:absolute;bottom:calc(var(--h) + 4px);font-size:11px;font-family:var(--f-num);color:var(--ink)}
+.xax{display:flex;gap:2px;margin-left:38px;font-size:11px;color:var(--muted);margin-top:4px}
+.xax span{flex:1;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tip{position:fixed;z-index:20;pointer-events:none;background:var(--ink);color:var(--bg);font-size:12px;padding:6px 9px;border-radius:6px;line-height:1.5;max-width:220px}
+
+.tablewrap{overflow-x:auto;margin-top:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:8px 10px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
+th{font-size:11px;color:var(--muted);font-weight:700;background:var(--sunk);position:sticky;top:0}
+th.l,td.l{text-align:left}
+td.l b{font-weight:700}
+tbody tr:last-child td{border-bottom:0}
+tr.flag td:first-child{box-shadow:inset 3px 0 0 var(--bad)}
+td .of{color:var(--muted);font-size:11px}
+.hsub{font-weight:400;font-size:10px;letter-spacing:0}
+.cmp{display:inline-grid;grid-template-columns:auto auto auto;align-items:end;column-gap:8px;font-family:var(--f-num);font-variant-numeric:tabular-nums}
+.cmp .pv{color:var(--muted);font-size:13px}
+.cmp .mid{display:flex;flex-direction:column;align-items:center;line-height:1.1}
+.cmp .mid .d{font-size:11px}
+.cmp .arr{color:var(--muted);font-size:12px}
+.cmp .cv{font-size:17px;font-weight:700;color:var(--ink);line-height:1.2}
+.cmp .plan{grid-column:1/-1;text-align:right;font-size:10px;color:var(--muted);font-family:var(--f-body)}
+tfoot td{font-weight:700;background:var(--sunk);border-top:1px solid var(--line);border-bottom:0}
+
+/* 生徒 */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.card.arch{opacity:.6}
+.card .h{display:flex;align-items:center;gap:8px}
+.card .h b{font-size:15px;overflow-wrap:anywhere}
+.card .h .btn{margin-left:auto}
+.prog{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;font-size:12px;align-items:center}
+.prog .n{color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prog .c{font-family:var(--f-num);color:var(--muted)}
+.prog .meter{grid-column:1/-1;margin:0 0 4px}
+.rlist{display:flex;flex-direction:column;gap:4px;margin-top:8px}
+.rrow{display:grid;grid-template-columns:2.4em minmax(0,1fr) auto;gap:8px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+.rrow .no{font-family:var(--f-num);color:var(--muted);text-align:right}
+.rrow .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rbtns{display:flex;gap:4px}
+.rbtns button{min-width:34px;height:32px;border:1px solid var(--line);background:var(--bg);border-radius:6px;font-size:12px;padding:0 6px}
+.rbtns button:disabled{opacity:.35;cursor:not-allowed}
+.sname{font-weight:700;width:fit-content;max-width:100%}
+.sname[style]{color:var(--c);background:color-mix(in srgb,var(--c) 13%,transparent);padding:1px 7px;border-radius:5px}
+.swatches{display:flex;flex-wrap:wrap;gap:6px}
+.sw{width:30px;height:30px;border-radius:50%;border:2px solid var(--surface);background:var(--c);box-shadow:0 0 0 1px var(--line);padding:0}
+.sw[aria-pressed="true"]{box-shadow:0 0 0 2px var(--ink)}
+.sw.none{width:auto;border-radius:999px;padding:0 10px;background:var(--bg);font-size:12px;color:var(--ink-2)}
+.preview{font-size:12px;color:var(--muted);margin-top:4px}
+.rgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,460px),1fr));gap:12px;align-items:start}
+.rgrid .panel{margin-top:0}
+.rnote{font-size:12px;color:var(--muted);margin:-6px 0 6px}
+.band{display:grid;grid-template-columns:9.5em minmax(0,1fr);gap:4px 10px;padding:8px 0;border-top:1px solid var(--line);align-items:center}
+.band:first-of-type{border-top:0}
+.band .bl{font-size:12px;font-weight:700;color:var(--ink-2)}
+.band.top .bl{color:var(--accent)}
+.band.zero .bl,.band.zero .bn{color:var(--muted);font-weight:400}
+.bc{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}
+.btrack{height:8px;border-radius:4px;background:var(--sunk);overflow:hidden}
+.bbar{display:block;height:100%;border-radius:4px;background:var(--bar)}
+.band.top .bbar{background:var(--accent)}
+.bn{font-family:var(--f-num);font-size:13px;font-weight:700;min-width:3em;text-align:right}
+.names{grid-column:2;display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12px}
+.nchip{display:inline-flex;align-items:baseline;gap:4px}
+.nchip .sname{font-size:12px}
+.copybox{width:100%;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px;font-size:12px;margin-bottom:8px}
+@media (max-width:760px){.band{grid-template-columns:1fr}.names{grid-column:1}}
+.banner.ok{background:var(--good-soft);color:var(--good)}
+.pk{font-size:10px;color:var(--accent);margin-top:2px;white-space:nowrap}
+.impprev{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.impthumb{max-width:220px;max-height:220px;border-radius:8px;border:1px solid var(--line);object-fit:contain;background:var(--sunk)}
+.impbusy{display:flex;gap:14px;align-items:center;background:var(--accent-soft);border-radius:var(--r);padding:14px}
+.spin{width:22px;height:22px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--accent);animation:spin 1s linear infinite;flex:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+table.imp td{vertical-align:top;text-align:left;white-space:normal}
+table.imp td.uns,.lrow.uns{background:var(--warn-soft)}
+table.imp tr.skip td{opacity:.45}
+table.imp input[type=number]{width:52px;border:1px solid var(--line);border-radius:6px;padding:3px 4px;background:var(--surface);font-family:var(--f-num)}
+table.imp select{border:1px solid var(--line);border-radius:6px;padding:3px 4px;background:var(--surface);max-width:9em;font-size:12px}
+.sheets{display:flex;flex-direction:column;gap:14px}
+.sheet{border:1px solid var(--line);border-radius:var(--r);padding:10px;display:flex;flex-direction:column;gap:10px}
+.sheet.skip{opacity:.55}
+.shead{display:flex;gap:12px;align-items:flex-start}
+.sinfo{display:flex;flex-direction:column;gap:6px;min-width:0}
+.srowh{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.impthumb.sm{max-width:90px;max-height:90px}
+.thumbf{margin:0;display:flex;flex-direction:column;align-items:center;gap:2px}
+.spin.sm{width:10px;height:10px;border-width:2px}
+.sinfo select{border:1px solid var(--line);border-radius:6px;padding:3px 6px;background:var(--surface)}
+.ptable th.today,.ptable td.today,table.imp td.today{background:var(--today-bg)}
+.ptable th.today{color:var(--today-ink);box-shadow:inset 0 3px 0 var(--today-ink)}
+.istoday{color:var(--today-ink);font-weight:700;background:var(--today-bg);border-radius:4px;padding:0 4px}
+.col.today .b{background:var(--today-ink)}
+.lrow{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-bottom:4px;border-radius:6px;padding:2px}
+.lrow .raw{font-size:11px;color:var(--muted)}
+.btn.xs{padding:2px 6px;font-size:12px}
+.hmi{font-size:12px;margin-right:8px}
+.unsure-key{background:var(--warn-soft);padding:0 4px;border-radius:4px}
+.gate{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:16px}
+.gatebox{width:min(360px,100%);background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:28px 22px;display:flex;flex-direction:column;gap:12px;text-align:center}
+.gatebox h1{font-size:20px;margin:0}
+.gatebox input{border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:12px;font-size:16px;text-align:center}
+.gatebox .btn{padding:10px;font-size:15px}
+.gmark{width:56px;height:56px;margin:0 auto;border-radius:14px;background:var(--accent);position:relative}
+.gmark::after{content:"";position:absolute;inset:12px 14px;border-radius:4px;background:repeating-linear-gradient(var(--surface) 0 4px,transparent 4px 9px)}
+body.locked header.top,body.locked main{visibility:hidden}
+#logout{color:var(--muted)}
+.memo{font-size:12px;color:var(--ink-2);white-space:pre-wrap;border-top:1px dashed var(--line);padding-top:6px}
+
+.editor{background:var(--surface);border:2px solid var(--accent);border-radius:var(--r);padding:16px;margin:12px 0;display:flex;flex-direction:column;gap:14px}
+.editor h3{margin:0;font-size:15px}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field>span{font-size:12px;font-weight:700;color:var(--ink-2)}
+.field input,.field select,.field textarea{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:7px 10px;min-width:0;width:100%}
+.sub-h{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.06em}
+.crow{display:grid;grid-template-columns:minmax(0,1fr) 90px 120px auto;gap:4px 8px;align-items:end}
+.crow .cfin{grid-column:1/-1;font-size:12px}
+.crow label.cfin{justify-self:start}
+.hrow{display:grid;grid-template-columns:90px 140px auto;gap:10px;align-items:center}
+.inline{display:inline-flex;align-items:center;gap:6px;font-size:13px}
+.err-msg{color:var(--bad);font-size:13px}
+.empty{background:var(--surface);border:1px dashed var(--line);border-radius:var(--r);padding:28px 18px;text-align:center;color:var(--ink-2);display:flex;flex-direction:column;gap:10px;align-items:center}
+.empty b{color:var(--ink);font-size:15px}
+.note{font-size:12px;color:var(--muted);margin-top:8px}
+
+@media (max-width:760px){
+  .srow{grid-template-columns:1fr auto}
+  .srow .cols{grid-column:1/-1}
+  .crow{grid-template-columns:1fr 1fr}
+  .crow .field:first-child{grid-column:1/-1}
+  .hrow{grid-template-columns:1fr;gap:4px;border-bottom:1px dashed var(--line);padding-bottom:6px}
+  .search{width:140px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+</head>
+<body class="locked">
+<header class="top">
+  <div class="wrap">
+    <div class="bar1">
+      <div class="brand">生徒進捗ノート <small>受講・高マス・登校</small></div>
+      <div class="save" id="save"><i></i><span>接続中…</span></div><button class="btn ghost xs" id="logout" type="button">ログアウト</button>
+    </div>
+    <nav class="tabs" id="tabs" role="tablist">
+      <button role="tab" data-tab="daily">日々の実績</button>
+      <button role="tab" data-tab="plan">週の予定</button>
+      <button role="tab" data-tab="week">週次サマリー</button>
+      <button role="tab" data-tab="month">月次サマリー</button>
+      <button role="tab" data-tab="rank">ランキング</button>
+      <button role="tab" data-tab="students">生徒</button>
+    </nav>
+  </div>
+</header>
+<div id="gate" class="gate"><form id="gateForm" class="gatebox" autocomplete="on">
+  <div class="gmark" aria-hidden="true"></div>
+  <h1>生徒進捗ノート</h1>
+  <p class="lead">担任助手用の合言葉を入れてください。この端末では、次からは入れなくても開けます。</p>
+  <input type="text" name="username" value="staff" autocomplete="username" hidden>
+  <input id="gatePass" type="password" autocomplete="current-password" placeholder="合言葉" aria-label="合言葉" required>
+  <button id="gateBtn" class="btn primary" type="submit">はじめる</button>
+  <p id="gateMsg" class="err-msg" role="status"></p>
+</form></div>
+<main class="wrap">
+  <div id="banner"></div>
+  <div class="filters" id="filters"></div>
+  <div id="view"></div>
+</main>
+<div class="tip" id="tip" hidden></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+// ===== 設定 =====
+const UNITS=[{id:'tango',name:'単語',stages:18},{id:'jukugo',name:'熟語',stages:15},{id:'bunpo',name:'文法',stages:15}];
+const GRADES=['高0','高1','高2'];
+// 生徒の名前に付ける色（l: ライト表示用、d: ダーク表示用）
+const COLORS=[
+  {id:'red',name:'赤',l:'#c62828',d:'#ff8a80'},{id:'vermilion',name:'朱',l:'#d84315',d:'#ff9e80'},{id:'orange',name:'橙',l:'#b25600',d:'#ffb74d'},
+  {id:'mustard',name:'山吹',l:'#8a6a00',d:'#ffd54f'},{id:'lime',name:'黄緑',l:'#4f7f22',d:'#b5dc85'},{id:'green',name:'緑',l:'#2e7d32',d:'#81c784'},
+  {id:'teal',name:'青緑',l:'#00786b',d:'#4fd1bf'},{id:'cyan',name:'水色',l:'#0272b0',d:'#62cdf7'},{id:'blue',name:'青',l:'#1e4fd8',d:'#8cafff'},
+  {id:'indigo',name:'藍',l:'#4338b8',d:'#aca8ff'},{id:'purple',name:'紫',l:'#7b1fa2',d:'#d29ae0'},{id:'magenta',name:'赤紫',l:'#a3155a',d:'#f28cbf'},
+  {id:'pink',name:'桃',l:'#c63f6c',d:'#ffa6c1'},{id:'brown',name:'茶',l:'#7a5240',d:'#d2ae9a'},{id:'gray',name:'灰',l:'#53646e',d:'#b4c2ca'}];
+(()=>{const L=COLORS.map(c=>'--sc-'+c.id+':'+c.l).join(';'),D=COLORS.map(c=>'--sc-'+c.id+':'+c.d).join(';');
+  const st=document.createElement('style');st.textContent=':root{'+L+'}@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){'+D+'}}:root[data-theme="dark"]{'+D+'}';document.head.appendChild(st)})();
+function sname(s){const c=COLORS.find(x=>x.id===s.color);return '<b class="sname"'+(c?' style="--c:var(--sc-'+c.id+')"':'')+'>'+esc(s.name)+'</b>'}
+const FIRST_MONTH='2026-09';
+const DOW=['日','月','火','水','木','金','土'];
+
+const S={students:{},pdays:{},days:{},settings:{weekStartDow:1},
+  tab:'daily',kpick:{},date:today(),weekStart:null,planStart:null,month:null,
+  grade:'all',q:'',showArchived:false,editing:null,editErr:'',
+  db:null,canWrite:true,loaded:{students:false,days:false,plans:false}};
+try{const t=localStorage.getItem('sn-tab');if(t)S.tab=t;const g=localStorage.getItem('sn-grade');if(g)S.grade=g}catch(e){}
+
+// ===== 日付 =====
+function pad(n){return String(n).padStart(2,'0')}
+function today(){const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}
+function toUTC(s){const [y,m,d]=s.split('-').map(Number);return Date.UTC(y,m-1,d)}
+function fromUTC(t){const d=new Date(t);return d.getUTCFullYear()+'-'+pad(d.getUTCMonth()+1)+'-'+pad(d.getUTCDate())}
+function addDays(s,n){return fromUTC(toUTC(s)+n*864e5)}
+function dow(s){return new Date(toUTC(s)).getUTCDay()}
+function md(s){const p=s.split('-');return Number(p[1])+'/'+Number(p[2])}
+function fmtDay(s){return md(s)+'('+DOW[dow(s)]+')'}
+function weekStartFor(s){const w=Number(S.settings.weekStartDow)||0;return addDays(s,-((dow(s)-w+7)%7))}
+function curMonth(){return today().slice(0,7)}
+function monthRange(ym){const [y,m]=ym.split('-').map(Number);return [ym+'-01',fromUTC(Date.UTC(y,m,0))]}
+function shiftMonth(ym,n){const [y,m]=ym.split('-').map(Number);const d=new Date(Date.UTC(y,m-1+n,1));return d.getUTCFullYear()+'-'+pad(d.getUTCMonth()+1)}
+function monthLabel(ym){const [y,m]=ym.split('-');return y+'年'+Number(m)+'月'}
+function monthList(){const out=[];const last=curMonth()>FIRST_MONTH?curMonth():FIRST_MONTH;let m=FIRST_MONTH;while(m<=last){out.push(m);m=shiftMonth(m,1)}return out}
+function rangeDays(a,b){const out=[];for(let d=a;d<=b;d=addDays(d,1))out.push(d);return out}
+
+// ===== ユーティリティ =====
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const clone=o=>JSON.parse(JSON.stringify(o??{}));
+const sumObj=o=>{let t=0;for(const k in o||{})t+=Number(o[k])||0;return t};
+const uid=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+function fmtN(n,dig=0){if(n==null||isNaN(n))return '—';return dig?n.toFixed(dig):String(Math.round(n))}
+function pct(n){return n==null?'—':(n*100).toFixed(1)+'%'}
+function delta(cur,prev,opt={}){
+  if(prev==null||cur==null)return '<span class="d flat">—</span>';
+  const dig=opt.dig||0;let d=cur-prev;if(Math.abs(d)<1e-9)d=0;
+  const unit=opt.unit||'';
+  const val=(Math.abs(d)).toFixed(dig)+unit;
+  const rate=(!opt.noRate&&prev>0&&d!==0)?' ('+(d>0?'+':'−')+Math.round(Math.abs(d)/prev*100)+'%)':'';
+  if(d>0)return '<span class="d up">▲'+val+rate+'</span>';
+  if(d<0)return '<span class="d down">▼'+val+rate+'</span>';
+  return '<span class="d flat">±0</span>';
+}
+
+// ===== 生徒・集計 =====
+// 登録順：createdAt。古いデータは id に含まれる登録時刻（36進数）から読み取る
+function orderKey(s){if(s.createdAt)return Number(s.createdAt);const t=parseInt(String(s.id||'').slice(1,-4),36);return isNaN(t)?Infinity:t}
+// 並び順：自分で並べ替えた順（order）。未設定なら登録順
+function sortKey(s){return s.order!=null?Number(s.order):orderKey(s)}
+function allStudents(){return Object.values(S.students).sort((a,b)=>(sortKey(a)-sortKey(b))||(orderKey(a)-orderKey(b))||String(a.id).localeCompare(String(b.id)))}
+function nextOrder(){const os=Object.values(S.students).map(s=>s.order).filter(o=>o!=null).map(Number);return os.length?Math.max(...os)+1:null}
+function visible(){return allStudents().filter(s=>!s.archived&&(S.grade==='all'||s.grade===S.grade)&&(!S.q||String(s.name).includes(S.q)))}
+function row(date,sid){return S.days[date]?.rows?.[sid]||null}
+function stats(sid,a,b){let lec=0,ex=0,att=0;for(const d in S.days){if(d<a||d>b)continue;const r=S.days[d].rows?.[sid];if(!r)continue;lec+=sumObj(r.courses);ex+=sumObj(r.hm);if(r.attend)att++}return {lec,ex,att}}
+// 受講済みコマ数（同じコマを繰り返しても1回と数える。番号なしの古い記録はそのまま足す）
+function courseDone(s,c,end){const base=Number(c.baseDone)||0,set=new Set();let legacy=0;
+  for(const d in S.days){if(end&&d>end)continue;const r=S.days[d].rows?.[s.id];if(!r)continue;const ks=r.komas?.[c.id]||[];ks.forEach(k=>{if(k>base)set.add(k)});legacy+=Math.max(0,(Number(r.courses?.[c.id])||0)-ks.length)}
+  return base+set.size+legacy}
+// コマ番号ごとの受講回数（before を渡すとその日より前だけ）
+function komaTimes(s,c,before){const cnt={},base=Number(c.baseDone)||0;for(let i=1;i<=base;i++)cnt[i]=1;
+  for(const d in S.days){if(before&&d>=before)continue;const ks=S.days[d].rows?.[s.id]?.komas?.[c.id]||[];ks.forEach(k=>cnt[k]=(cnt[k]||0)+1)}return cnt}
+function komaInput(s,c,r,D){
+  const k=Number(c.koma)||0,ks=r.komas?.[c.id]||[],legacy=Math.max(0,(Number(r.courses?.[c.id])||0)-ks.length);
+  const prior=komaTimes(s,c,D),seen={},total=komaTimes(s,c);
+  const chips=ks.map((n,i)=>{seen[n]=(seen[n]||0)+1;const nth=(prior[n]||0)+seen[n];
+    return '<span class="kc">第'+n+'コマ'+(nth>1?' <b>'+nth+'回目</b>':'')+'<button data-act="kdel" data-sid="'+s.id+'" data-id="'+c.id+'" data-i="'+i+'" aria-label="第'+n+'コマを取り消す"'+(W()?'':' disabled')+'>×</button></span>'}).join('');
+  const leg=legacy?'<span class="kc">番号なし '+legacy+'コマ<button data-act="dc" data-sid="'+s.id+'" data-id="'+c.id+'" data-d="-1" aria-label="番号なしを1減らす"'+(W()?'':' disabled')+'>×</button></span>':'';
+  const key=s.id+'|'+c.id;let next=1;while(next<=k&&total[next])next++;if(next>k)next=k||1;
+  const pick=Number(S.kpick[key])||next;
+  const opts=Array.from({length:Math.max(k,1)},(_,i)=>i+1).map(n=>'<option value="'+n+'"'+(n===pick?' selected':'')+'>第'+n+'コマ'+(total[n]?'（済'+total[n]+'回）':'')+'</option>').join('');
+  const done=Math.min(courseDone(s,c),k);
+  return '<span class="kgrp"><span class="nm" title="'+esc(c.name)+'">'+esc(c.name)+'</span>'+chips+leg+
+    '<select class="ksel" id="ks-'+s.id+'-'+c.id+'" data-kpick="'+key+'" aria-label="'+esc(c.name)+'の受講したコマ"'+(W()?'':' disabled')+'>'+opts+'</select>'+
+    '<button class="kadd" data-act="kadd" data-sid="'+s.id+'" data-id="'+c.id+'"'+(W()?'':' disabled')+'>＋ 追加</button><small>'+done+'/'+k+(done>=k&&k?' 修了':'')+'</small></span>'}
+function hmCleared(s,u,end){let t=Number(s.hmBase?.[u.id]?.cleared)||0;for(const d in S.days){if(end&&d>end)continue;t+=Number(S.days[d].rows?.[s.id]?.hm?.[u.id])||0}return t}
+function hmPassed(s,u,end,exceptDate){if(s.hmBase?.[u.id]?.passed)return true;for(const d in S.days){if(end&&d>end)continue;if(d===exceptDate)continue;if(S.days[d].rows?.[s.id]?.final?.[u.id])return true}return false}
+function rate(s,end){let tot=0,done=0;for(const c of s.courses||[]){const k=Number(c.koma)||0;tot+=k;done+=Math.min(courseDone(s,c,end),k)}return tot?{done,tot,r:done/tot}:null}
+// 今日の日付の列に付ける印
+function TD(d){return d===today()?' class="today"':''}
+function prow(date,sid){return S.pdays[date]?.rows?.[sid]||null}
+// 生徒が受講している高マスの単元（チェック項目がない古いデータは全単元を受講扱い）
+function sUnits(s){return UNITS.filter(u=>!s.hmUnits||s.hmUnits[u.id])}
+function planTot(sid,a,b){let lec=0,ex=0,att=0,set=false;for(const d of rangeDays(a,b)){const p=prow(d,sid);if(!p)continue;set=true;lec+=sumObj(p.courses);ex+=sumObj(p.hm);if(p.attend)att++}return {lec,ex,att,set}}
+
+// ===== 保存 =====
+const W=()=>!!S.db&&S.canWrite!==false;
+const pending=new Map(), chains=new Map();
+let saveState='idle';
+function setSave(st,msg){saveState=st;const el=document.getElementById('save');el.className='save '+({saved:'ok',saving:'busy',error:'err'}[st]||'');
+  el.querySelector('span').textContent=msg||({saved:'保存済み',saving:'保存中…',error:'保存できませんでした',idle:'接続済み',off:'保存先に未接続',ro:'閲覧のみ'}[st]||'')}
+function overlay(coll){for(const [,p] of pending){if(p.coll!==coll)continue;const doc=S[coll][p.docId]=clone(S[coll][p.docId]||p.extra);doc.rows=doc.rows||{};doc.rows[p.sid]=p.row}}
+function queueRow(coll,docId,sid,rowData,extra){
+  if(!W())return;
+  const doc=S[coll][docId]=clone(S[coll][docId]||extra);doc.rows=doc.rows||{};doc.rows[sid]=rowData;
+  const k=coll+'|'+docId+'|'+sid;const old=pending.get(k);if(old)clearTimeout(old.timer);
+  const p={coll,docId,sid,row:rowData,extra};p.timer=setTimeout(()=>flush(k),600);pending.set(k,p);
+  setSave('saving');render();
+}
+function flush(k){
+  const p=pending.get(k);if(!p)return;pending.delete(k);
+  const key=p.coll+'/'+p.docId;
+  const next=(chains.get(key)||Promise.resolve()).then(async()=>{
+    const ref=S.db.doc(key);const snap=await ref.get();
+    if(snap.exists)await ref.update({rows:{[p.sid]:p.row}});
+    else await ref.set({...p.extra,rows:{[p.sid]:p.row}});
+  }).then(()=>{if(!pending.size)setSave('saved')},e=>{handleWriteErr(e)});
+  chains.set(key,next.catch(()=>{}));
+}
+function handleWriteErr(e){
+  if(e&&e.code==='invalid_argument'&&S.canWrite===null){S.canWrite=false;setSave('ro');render();return}
+  setSave('error',e?.code==='quota_exceeded'?'保存容量の上限です':'保存できませんでした');
+}
+async function writeDoc(path,data,merge){
+  if(!W())return false;setSave('saving');
+  try{const ref=S.db.doc(path);if(merge){const s=await ref.get();if(s.exists)await ref.update(data);else await ref.set(data)}else await ref.set(data);
+    if(!pending.size)setSave('saved');return true}catch(e){handleWriteErr(e);return false}
+}
+
+// ===== 描画 =====
+let deferred=false;
+function render(){
+  const v=document.getElementById('view');
+  const ae=document.activeElement;
+  if(ae&&v.contains(ae)&&(ae.tagName==='INPUT'&&ae.type!=='checkbox'&&ae.type!=='date'||ae.tagName==='TEXTAREA')){deferred=true;return}
+  deferred=false;
+  document.querySelectorAll('#tabs button').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===S.tab)));
+  renderBanner();renderFilters();
+  const fn={daily:vDaily,plan:vPlan,week:vWeek,month:vMonth,rank:vRank,students:vStudents}[S.tab]||vDaily;
+  v.innerHTML=fn();
+}
+document.addEventListener('focusout',()=>setTimeout(()=>{if(deferred)render()},0));
+
+function renderBanner(){
+  const b=document.getElementById('banner');
+  if(!S.db&&S.dbChecked)b.innerHTML='<div class="banner err">データの保存先に接続できていません。通信状況を確認して、ページを開き直してください。</div>';
+  else if(S.canWrite===false)b.innerHTML='<div class="banner">閲覧のみの権限で開いています。入力するには、このページの持ち主に「Contributor（共同編集）」以上の権限をもらってください。</div>';
+  else b.innerHTML='';
+}
+function renderFilters(){
+  const f=document.getElementById('filters');
+  if((S.tab==='students'&&(S.editing||S.reorder))||(S.tab==='plan'&&S.imp)){f.innerHTML='';return}
+  const n=visible().length;
+  f.innerHTML='<div class="chips" role="group" aria-label="学年">'+['all',...GRADES].map(g=>'<button class="chip" data-act="grade" data-g="'+g+'" aria-pressed="'+(S.grade===g)+'">'+(g==='all'?'全員':g)+'</button>').join('')+'</div>'+
+    '<input class="search" id="q" type="search" placeholder="名前で絞り込み" value="'+esc(S.q)+'" aria-label="名前で絞り込み">'+
+    '<span class="fcount">表示中 <b class="num">'+n+'</b> 名</span>';
+}
+function emptyStudents(){
+  if(!S.loaded.students)return '<div class="empty"><b>読み込み中…</b></div>';
+  if(allStudents().filter(s=>!s.archived).length===0)return '<div class="empty"><b>まだ生徒が登録されていません</b><span>「生徒」タブで、名前・学年・受講している講座を登録すると、ここに入力欄が並びます。</span><button class="btn primary" data-act="goto" data-tab="students">生徒を登録する</button></div>';
+  return '<div class="empty"><b>条件に合う生徒がいません</b><span>学年や名前の絞り込みを変えてください。</span></div>';
+}
+function groupByGrade(list,fn){return list.map(fn).join('')}
+function stepper(act,sid,id,val,canDec,canInc,name,note){
+  return '<span class="step">'+(name?'<span class="nm" title="'+esc(name)+'">'+esc(name)+'</span>':'')+
+    '<button data-act="'+act+'" data-sid="'+sid+'" data-id="'+id+'" data-d="-1" aria-label="'+esc(name||'')+' を1減らす"'+(canDec&&W()?'':' disabled')+'>−</button>'+
+    '<output class="'+(val?'':'z')+'">'+val+'</output>'+
+    '<button data-act="'+act+'" data-sid="'+sid+'" data-id="'+id+'" data-d="1" aria-label="'+esc(name||'')+' を1増やす"'+(canInc&&W()?'':' disabled')+'>+</button>'+
+    (note?'<small>'+note+'</small>':'')+'</span>';
+}
+
+// --- 日々の実績 ---
+function vDaily(){
+  const D=S.date,list=visible();
+  let tl=0,te=0,ta=0;for(const s of list){const r=row(D,s.id);if(!r)continue;tl+=sumObj(r.courses);te+=sumObj(r.hm);if(r.attend)ta++}
+  let h='<h2>日々の実績</h2><p class="lead">その日に実際にやったことを入力します。演習数は高マスでクリアしたステージ数で数えます。</p>'+
+  '<div class="toolbar sticky"><button class="btn" data-act="day" data-d="-1" aria-label="前の日">◀</button><input class="date" type="date" id="dDate" value="'+D+'"><button class="btn" data-act="day" data-d="1" aria-label="次の日">▶</button>'+
+  '<span class="range'+(D===today()?' istoday':'')+'">'+fmtDay(D)+(D===today()?' 今日':'')+'</span>'+(D!==today()?'<button class="btn ghost" data-act="today">今日</button>':'')+
+  '<span class="sep"></span><div class="totals"><span>登校 <b>'+ta+'</b> 名</span><span>受講 <b>'+tl+'</b> コマ</span><span>演習 <b>'+te+'</b> ステージ</span></div></div>';
+  if(!list.length)return h+emptyStudents();
+  h+='<div class="list">'+groupByGrade(list,s=>{
+    const r=row(D,s.id)||{};
+    const courses=(s.courses||[]).map(c=>komaInput(s,c,r,D)).join('')||'<span class="none">講座が未登録です</span>';
+    const hm=sUnits(s).map(u=>{const cur=Number(r.hm?.[u.id])||0;const all=hmCleared(s,u);const passedElse=hmPassed(s,u,null,D);
+      let x=stepper('dh',s.id,u.id,cur,cur>0,all<u.stages,u.name,Math.min(all,u.stages)+'/'+u.stages);
+      if(passedElse)x+='<span class="badge">'+u.name+' 修得済</span>';
+      else if(all>=u.stages)x+='<label class="final"><input type="checkbox" data-act="final" data-sid="'+s.id+'" data-id="'+u.id+'"'+(r.final?.[u.id]?' checked':'')+(W()?'':' disabled')+'> '+u.name+' 修了判定に合格</label>';
+      return x}).join('');
+    return '<div class="srow"><div class="who">'+sname(s)+'<span class="grade">'+esc(s.grade)+'</span></div>'+
+      '<button class="att" data-act="att" data-sid="'+s.id+'" aria-pressed="'+(!!r.attend)+'"'+(W()?'':' disabled')+'>'+(r.attend?'登校 ✓':'登校')+'</button>'+
+      '<div class="cols"><div class="grp"><span class="lbl">受講</span>'+courses+'</div>'+(hm?'<div class="grp"><span class="lbl">高マス</span>'+hm+'</div>':'')+'</div></div>'}
+  )+'</div><p class="note">受講は、受けたコマの番号を選んで「＋ 追加」を押します。同じコマをもう一度受けると「2回目」と表示されます。右の小さな数字は「これまでの累計 / 全体」です（同じコマの繰り返しは1回と数えます）。全ステージをクリアすると修了判定の欄が出ます。</p>';
+  return h;
+}
+function editDay(sid,fn){const r=clone(row(S.date,sid)||{attend:false,courses:{},hm:{},final:{}});r.courses=r.courses||{};r.hm=r.hm||{};r.final=r.final||{};fn(r);queueRow('days',S.date,sid,r,{date:S.date})}
+
+// --- 週の予定（1日ごとに保存するので、開始日を変えても予定は消えない） ---
+// --- 写真から読み込む（予定表の紙を読み取って週の予定に入れる） ---
+const ROMAN='ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ';
+function normName(x){return String(x||'').replace(/[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]/g,c=>String(ROMAN.indexOf(c)+1)).normalize('NFKC').toLowerCase().replace(/iii/g,'3').replace(/ii/g,'2').replace(/[\s・\-_]|組|講|コマ|第/g,'')}
+function splitRaw(raw){const m=String(raw||'').match(/^(.*?)(\d+)\s*(?:講|コマ)?\s*$/);return m?{prefix:m[1],koma:Number(m[2])}:{prefix:String(raw||''),koma:0}}
+// 講座がどの科目か。ここに載っていない講座は、名前に「英」→英語、「数」→数学
+const SUBJECTS={'英語':['C組','D組','E組','武藤のレベルアップ']};
+const SUBJ_ABBR={'英語':['英','英語'],'数学':['数','数学']};
+function subjectOf(name){const n=normName(name);for(const k in SUBJECTS)if(SUBJECTS[k].some(x=>normName(x)===n))return k;
+  const t=String(name||'');if(t.includes('英'))return '英語';if(t.includes('数'))return '数学';return ''}
+// 修得済み（自分でチェック、または全コマ受講済み）の講座は、略記の候補から外す
+function courseFinished(s,c){return !!c.finished||courseDone(s,c)>=(Number(c.koma)||20)}
+// 「C14」「数2 10」「英18」のような略記から、その生徒の講座を1つに決める（決められなければ null）
+function matchCourse(s,raw){const pre=normName(splitRaw(raw).prefix);if(!pre)return null;
+  const cs=s.courses||[],open=cs.filter(c=>!courseFinished(s,c));
+  const pick=list=>list.length===1?list[0].id:null;
+  // 1) 講座名そのもの（例：C → C組、数2 → 数Ⅱ）
+  const byName=cs.filter(c=>{const n=normName(c.name);return n&&(n.startsWith(pre)||pre.startsWith(n))});
+  if(byName.length===1)return byName[0].id;
+  if(byName.length>1){const o=byName.filter(c=>!courseFinished(s,c));if(o.length===1)return o[0].id}
+  // 2) 科目の略記（例：英 → 英語の講座のうち、修得していないもの）
+  for(const k in SUBJ_ABBR)if(SUBJ_ABBR[k].some(a=>normName(a)===pre)){const r=pick(open.filter(c=>subjectOf(c.name)===k));if(r)return r}
+  return pick(byName)}
+const IMP_MAX=10;
+function courseInfo(s){return (s.courses||[]).map(c=>({id:c.id,name:c.name,subject:subjectOf(c.name)||'不明',finished:courseFinished(s,c),koma:Number(c.koma)||20}))}
+// s を渡すとその生徒用。null なら名簿から氏名で生徒を決めてもらう
+function impPrompt(s){
+  const year=today().slice(0,4);
+  const roster=s?null:allStudents().filter(x=>!x.archived).map(x=>({sid:x.id,name:x.name,grade:x.grade,courses:courseInfo(x),hm:sUnits(x).map(u=>u.id)}));
+  return 'あなたは手書きの予定表を読み取る係です。画像は塾の生徒が書いた「予定表」の写真です。1枚目は紙全体、2枚目以降は同じ写真を半分に切った拡大用です（ない場合もあります）。紙は横向きや逆さまに写っていることがあります。\n\n'+
+  '紙の構成：上に「氏名」欄と目標欄（目標欄は読まなくてよい）。表が2つあり、それぞれ7日分（合計14日）。各表の行は上から\n'+
+  '・日付（例「10/16(金)」。月が省略されて「19(月)」のように書かれることがある）\n・登校有無（「有・無」のどちらかに丸）\n・登校時間（例「17:00」）\n・受講（最大4行。例「C14」＝講座Cの第14講、「数2 10」＝数Ⅱの第10講、「英18」＝英語の講座の第18講）\n・高マス（例「単語3」＝単語を3ステージ）\n・確認欄（読まない）\n\n'+
+  '年は'+year+'年とする。月が省略された日付は前後の日付から補う。日付が書かれていない列は出力しない。\n'+
+  (s?'この生徒が登録している講座：'+JSON.stringify(courseInfo(s))+'\nこの生徒が受講している高マスの単元：'+JSON.stringify(sUnits(s).map(u=>({id:u.id,name:u.name})))+'（空なら高マスは出力しない）\n'
+    :'生徒名簿（sid・氏名・学年・講座・受講している高マスの単元id）：'+JSON.stringify(roster)+'\n氏名欄の手書きの名前から、名簿の生徒を1人選んで sid に入れる。名字だけ・崩し字・似た字でも、名簿の中で最も当てはまる生徒を選ぶ。決められなければ sid は null。受講と高マスは、その生徒の講座・単元から選ぶ。高マスの単元id：tango=単語、jukugo=熟語、bunpo=文法。\n')+
+  '受講は、講座一覧から最も当てはまるものの id を course に入れる。略記、全角と半角、「Ⅱ」「II」「2」の違い、「組」「講」の有無は同じものとみなす。「英18」「数10」のように科目名（英・英語・数・数学）だけで書かれた場合は、その科目（subject）の講座のうち finished が false のものを選ぶ（例：英語の講座がC組とD組で、D組が finished なら「英18」はC組の第18講）。どれか決められなければ course は null。koma は講の番号（数字）。\n\n'+
+  'JSONだけで答える。形：\n{"name":"氏名欄の文字",'+(s?'':'"sid":"名簿のsid",')+'"days":[{"date":"'+year+'-10-16","dow":"金","attend":false,"time":"","lectures":[{"raw":"C14","course":"講座のid","koma":14}],"hm":[{"raw":"単語3","unit":"tango","stages":3}],"unsure":[]}]}\n'+
+  'attend：「有」に丸→true、「無」に丸→false、どちらにも丸がない→null。time は "HH:MM"（24時間表記、書かれていなければ ""）。raw は紙に書かれた文字そのまま。読みにくい・自信がない項目は unsure に "date" "attend" "time" "lectures" "hm" のうち当てはまるものを入れる。';
+}
+// 読み取った氏名から生徒を決める（1人に決まらなければ ''）
+function matchStudent(name){const n=normName(name);if(!n)return '';const ss=allStudents().filter(x=>!x.archived);
+  const eq=ss.filter(x=>normName(x.name)===n);if(eq.length===1)return eq[0].id;
+  const part=ss.filter(x=>{const m=normName(x.name);return m&&(m.includes(n)||n.includes(m))});return part.length===1?part[0].id:''}
+function normImport(raw,s){
+  const units=sUnits(s),seen=new Set(),days=[];
+  for(const d of (raw&&Array.isArray(raw.days)?raw.days:[])){
+    const m=String(d&&d.date||'').trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);if(!m)continue;
+    const date=m[1]+'-'+pad(m[2])+'-'+pad(m[3]);if(seen.has(date))continue;seen.add(date);
+    const unsure=Array.isArray(d.unsure)?d.unsure.map(String):[];
+    const dw=String(d.dow||'').replace(/[()（）曜日\s]/g,'').slice(0,1);if(dw&&DOW[dow(date)]!==dw)unsure.push('date');
+    let attend=d.attend;if(attend!==true&&attend!==false){attend=false;unsure.push('attend')}
+    const tm=String(d.time||'').trim().match(/^(\d{1,2})[:：](\d{2})$/);const time=tm?pad(tm[1])+':'+tm[2]:'';if(attend&&!time)unsure.push('time');
+    const lectures=(Array.isArray(d.lectures)?d.lectures:[]).map(l=>{const rawTxt=String(l&&l.raw||'');
+      const course=(s.courses||[]).some(c=>c.id===l.course)?l.course:matchCourse(s,rawTxt);
+      const koma=Math.max(0,Math.round(Number(l.koma)||splitRaw(rawTxt).koma||0));
+      if(!course||!koma)unsure.push('lectures');return {raw:rawTxt,course:course||'',koma}});
+    const hm={};for(const h of (Array.isArray(d.hm)?d.hm:[])){const u=units.find(x=>x.id===h.unit)||units.find(x=>String(h.raw||'').includes(x.name));
+      if(u)hm[u.id]=(hm[u.id]||0)+Math.max(0,Math.round(Number(h.stages)||0));else unsure.push('hm')}
+    days.push({date,attend,time,lectures,hm,unsure:[...new Set(unsure)],skip:false});
+  }
+  days.sort((a,b)=>a.date<b.date?-1:1);
+  return {name:String(raw&&raw.name||'').trim(),days};
+}
+// 写真を JPEG に描き直し、拡大用に紙の半分ずつも切り出す
+async function prepImages(file){
+  const url=URL.createObjectURL(file);
+  try{
+    const img=new Image();img.src=url;await img.decode();
+    const W=img.naturalWidth,H=img.naturalHeight;
+    const cut=(x,y,w,h)=>{const sc=Math.min(1,3000/Math.max(w,h));const c=document.createElement('canvas');c.width=Math.round(w*sc);c.height=Math.round(h*sc);
+      c.getContext('2d').drawImage(img,x,y,w,h,0,0,c.width,c.height);return new Promise(r=>c.toBlob(r,'image/jpeg',0.9))};
+    const out=[await cut(0,0,W,H)];
+    if((S.imgLimit?.maxCount||1)>=3){const ov=0.04;
+      if(H>=W){const w=W*(0.5+ov);out.push(await cut(0,0,w,H),await cut(W-w,0,w,H))}
+      else{const h=H*(0.5+ov);out.push(await cut(0,0,W,h),await cut(0,H-h,W,h))}}
+    return out.filter(Boolean);
+  }finally{URL.revokeObjectURL(url)}
+}
+function impErr(e){return ({not_granted:'Claudeの利用が許可されていません。もう一度読み取るときに出る確認で「許可」を選んでください。',sampling_disabled:'このアカウントではClaudeを使った読み取りができません。',
+  rate_limited:'Claudeの利用が混み合っているか、利用上限に達しています。少し時間をおいてから読み取ってください。',image_rejected:'この写真は読み込めませんでした。JPEGかPNGの写真を選び直してください。',
+  images_unavailable:'この画面では写真を送れません。claude.ai 上でこのページを開いてください。',invalid_json:'読み取りがうまくいきませんでした。もう一度「読み取る」を押してください。',
+  refused:'この写真は読み取れませんでした。予定表の紙だけが写った写真を選んでください。',cancelled:''}[e&&e.code])??'読み取りに失敗しました。通信状況を確認して、もう一度「読み取る」を押してください。'}
+// 1枚分を読み取る
+async function readSheet(I,sh){
+  sh.status='reading';render();
+  try{
+    const fixed=I.sid?S.students[I.sid]:null;
+    const imgs=await prepImages(sh.file);
+    const raw=await S.sample.json(impPrompt(fixed),{images:imgs,signal:I.ctl.signal,cache:false});
+    if(S.imp!==I)return;
+    sh.raw=raw;sh.name=String(raw&&raw.name||'').trim();
+    let sid=fixed?fixed.id:'';
+    if(!sid){const c=raw&&raw.sid;sid=(c&&S.students[c]&&!S.students[c].archived)?c:matchStudent(sh.name);sh.auto=!!sid}
+    setSheetStudent(sh,sid);
+    sh.status=sh.data&&!sh.data.days.length?'error':'done';if(sh.status==='error')sh.err='日付が読み取れませんでした。紙全体が写った、明るい写真か確認してください。';
+  }catch(e){if(S.imp!==I)return;sh.status='error';sh.err=impErr(e)||'中止しました。'}
+  render();
+}
+function setSheetStudent(sh,sid){sh.sid=sid||'';const st=S.students[sh.sid];sh.data=st&&sh.raw?normImport(sh.raw,st):(sh.raw?{name:sh.name,days:[]}:null)}
+async function runImport(){
+  const I=S.imp;if(!I)return;let obj;
+  try{obj=JSON.parse(String(I.paste||'').trim())}catch(e){I.err='貼り付けた文字を読み込めませんでした。Claude版でコピーした文字を、そのまま全部貼り付けてください。';render();return}
+  const list=Array.isArray(obj)?obj:(obj&&Array.isArray(obj.sheets)?obj.sheets:[]);
+  if(!list.length){I.err='読み取り結果が入っていません。Claude版で読み取ってから「新しいアプリ用にコピー」を押してください。';render();return}
+  I.sheets=list.map(x=>{const raw=x&&x.raw?x.raw:x;
+    const sh={file:null,url:'',status:'done',err:'',sid:'',raw,name:String(x&&x.name||raw&&raw.name||'').trim(),skip:false,auto:false};
+    const ok=id=>id&&S.students[id]&&!S.students[id].archived;
+    const sid=ok(x&&x.sid)?x.sid:ok(raw&&raw.sid)?raw.sid:matchStudent(sh.name);
+    sh.auto=!!sid;setSheetStudent(sh,sid);
+    if(sh.data&&!sh.data.days.length){sh.status='error';sh.err='日付が読み取れていません。'}
+    return sh});
+  I.step='review';I.err='';render();
+}
+function impStatus(sh){return {wait:'<span class="badge warn">待ち</span>',reading:'<span class="badge warn"><span class="spin sm" aria-hidden="true"></span>読み取り中</span>',done:'<span class="badge">読み取り済み</span>',error:'<span class="badge bad">読み取れず</span>'}[sh.status]}
+function vSheet(I,sh,si){
+  const s=S.students[sh.sid],studs=allStudents().filter(x=>!x.archived);
+  const dup=sh.sid&&I.sheets.some((o,oi)=>oi!==si&&!o.skip&&o.sid===sh.sid);
+  let h='<section class="sheet'+(sh.skip?' skip':'')+'"><div class="shead">'+(sh.url?'<img class="impthumb sm" src="'+sh.url+'" alt="写真'+(si+1)+'">':'')+'<div class="sinfo">'+
+    '<div class="srowh"><b>写真'+(si+1)+'</b>'+impStatus(sh)+(sh.name?'<span class="rnote" style="margin:0">紙の氏名：「'+esc(sh.name)+'」</span>':'')+'</div>'+
+    (sh.status==='done'||(sh.status==='error'&&sh.raw)?'<label class="inline">登録する生徒 <select data-imp="ssid" data-si="'+si+'"'+(sh.skip?' disabled':'')+'><option value="">選んでください</option>'+studs.map(x=>'<option value="'+x.id+'"'+(x.id===sh.sid?' selected':'')+'>'+esc(x.name)+'（'+esc(x.grade)+'）</option>').join('')+'</select></label>'+
+      (sh.sid?(sh.auto?'<span class="rnote" style="margin:0">氏名から自動で選びました</span>':''):'<span class="badge bad">生徒が決まっていません</span>'):'')+
+    (dup?'<span class="badge warn">同じ生徒の写真がほかにもあります</span>':'')+
+    (sh.err?'<div class="err-msg">'+esc(sh.err)+'</div>':'')+
+    '<label class="inline"><input type="checkbox" data-imp="sskip" data-si="'+si+'"'+(sh.skip?' checked':'')+'> この写真は取り込まない</label></div></div>';
+  if(sh.skip||!s||!sh.data||!sh.data.days.length)return h+'</section>';
+  const D=sh.data,units=sUnits(s);
+  h+='<div class="tablewrap" style="margin:0"><table class="imp"><thead><tr><th>取り込む</th><th class="l">日付</th><th class="l">登校</th><th class="l">時間</th><th class="l">受講</th>'+(units.length?'<th class="l">高マス</th>':'')+'</tr></thead><tbody>'+
+  D.days.map((d,i)=>{const u=k=>d.unsure.includes(k)?' uns':'';const off=d.skip?' disabled':'';const at=' data-si="'+si+'" data-di="'+i+'"';
+    const lec=d.lectures.map((l,j)=>{const bad=!l.course||!l.koma;return '<div class="lrow'+(bad?' uns':'')+'"><select data-imp="lcourse"'+at+' data-li="'+j+'" aria-label="講座"'+off+'><option value="">講座を選ぶ</option>'+(s.courses||[]).map(c=>'<option value="'+c.id+'"'+(c.id===l.course?' selected':'')+'>'+esc(c.name)+'</option>').join('')+'</select>'+
+      '<span class="rnote" style="margin:0">第</span><input type="number" min="1" max="99" inputmode="numeric" data-imp="lkoma"'+at+' data-li="'+j+'" value="'+(l.koma||'')+'" aria-label="講の番号"'+off+'><span class="rnote" style="margin:0">講</span>'+
+      (l.raw?'<span class="raw">紙：'+esc(l.raw)+'</span>':'')+'<button class="btn ghost xs" data-act="impldel"'+at+' data-li="'+j+'" aria-label="この受講を消す"'+off+'>×</button></div>'}).join('')+
+      '<button class="btn ghost xs" data-act="impladd"'+at+off+'>＋ 受講</button>';
+    const hm=units.map(un=>'<label class="inline hmi">'+un.name+'<input type="number" min="0" max="99" inputmode="numeric" data-imp="hm"'+at+' data-u="'+un.id+'" value="'+(d.hm[un.id]||'')+'" placeholder="0" aria-label="'+un.name+'のステージ数"'+off+'></label>').join('');
+    return '<tr class="'+(d.skip?'skip':'')+'"><td><input type="checkbox" data-imp="use"'+at+(d.skip?'':' checked')+' aria-label="'+fmtDay(d.date)+'を取り込む"></td>'+
+      '<td class="l'+u('date')+(d.date===today()?' today':'')+'"><input type="date" class="date" data-imp="date"'+at+' value="'+d.date+'"'+off+'><div class="rnote" style="margin:0">'+fmtDay(d.date)+'</div></td>'+
+      '<td class="l'+u('attend')+'"><label class="inline"><input type="checkbox" data-imp="attend"'+at+(d.attend?' checked':'')+off+'> 有</label></td>'+
+      '<td class="l'+u('time')+'">'+(d.attend?'<input type="time" class="tm" data-imp="time"'+at+' value="'+esc(d.time)+'" step="300"'+off+'>':'<span class="rnote" style="margin:0">—</span>')+'</td>'+
+      '<td class="l'+u('lectures')+'">'+lec+'</td>'+(units.length?'<td class="l'+u('hm')+'">'+hm+'</td>':'')+'</tr>'}).join('')+
+  '</tbody></table></div>';
+  return h+'</section>';
+}
+function vImport(){
+  const I=S.imp,studs=allStudents().filter(x=>!x.archived);
+  let h='<div class="editor"><h3>読み取り結果を貼り付け</h3>';
+  if(I.step==='pick'){
+    h+='<p class="lead" style="margin:0">写真の読み取りは Claude版 で行います。Claude版の「写真から読み込む」で読み取ったあと、「新しいアプリ用にコピー」を押してコピーした文字を、下に貼り付けてください。紙の氏名から生徒を自動で決め、保存する前に確認・修正できます。</p>'+
+    '<textarea id="impPaste" class="copybox" rows="6" placeholder="ここに貼り付け" aria-label="読み取り結果">'+esc(I.paste||'')+'</textarea>'+
+    (I.err?'<div class="err-msg">'+esc(I.err)+'</div>':'')+
+    '<div class="toolbar" style="margin:0"><button class="btn primary" data-act="impread">読み込む</button><button class="btn" data-act="impcancel">やめる</button></div>';
+    return h+'</div>';
+  }
+  if(false){
+    h+='<p class="lead" style="margin:0">予定表の紙の写真を読み取って、週の予定に入れます。写真は最大'+IMP_MAX+'枚まで一度に選べます。紙の氏名から生徒を自動で決めるので、何人分でもまとめて登録できます。読み取った内容は、保存する前に確認・修正できます。</p>'+
+    '<div class="fgrid"><label class="field"><span>生徒</span><select id="impSid"><option value=""'+(I.sid?'':' selected')+'>写真の氏名から自動で決める（複数枚OK）</option>'+studs.map(x=>'<option value="'+x.id+'"'+(x.id===I.sid?' selected':'')+'>'+esc(x.name)+'（'+esc(x.grade)+'）だけ</option>').join('')+'</select></label>'+
+    '<label class="field"><span>予定表の写真（最大'+IMP_MAX+'枚）</span><input type="file" id="impFile" accept="image/*" multiple></label></div>'+
+    (I.files.length?'<div class="impprev">'+I.files.map((f,i)=>'<figure class="thumbf"><img class="impthumb sm" src="'+f.url+'" alt="写真'+(i+1)+'"><figcaption class="rnote" style="margin:0">写真'+(i+1)+' <button class="btn ghost xs" data-act="impfdel" data-i="'+i+'" aria-label="写真'+(i+1)+'を外す">×</button></figcaption></figure>').join('')+'</div>':'')+
+    '<p class="rnote" style="margin:0">紙全体が写るように、明るい場所で撮った写真を選んでください。1枚に生徒1人分です。1枚あたり30秒〜1分ほどかかります（2枚ずつ同時に読みます）。</p>'+
+    (I.err?'<div class="err-msg">'+esc(I.err)+'</div>':'')+
+    '<div class="toolbar" style="margin:0"><button class="btn primary" data-act="impread"'+(I.files.length?'':' disabled')+'>'+(I.files.length>1?I.files.length+'枚を読み取る':'読み取る')+'</button><button class="btn" data-act="impcancel">やめる</button></div>';
+    return h+'</div>';
+  }
+  const done=I.sheets.filter(x=>x.status==='done'||x.status==='error').length;
+  if(I.step==='reading'){
+    h+='<div class="impbusy"><span class="spin" aria-hidden="true"></span><div><b>写真を読み取っています…（'+done+' / '+I.sheets.length+'枚）</b><p class="rnote" style="margin:0">1枚あたり30秒〜1分ほどかかります。初めて使うときは、Claudeの利用を許可する確認が出ます。</p></div></div>'+
+    '<div class="sheets">'+I.sheets.map((sh,i)=>'<div class="shead"><img class="impthumb sm" src="'+sh.url+'" alt="写真'+(i+1)+'"><div class="srowh"><b>写真'+(i+1)+'</b>'+impStatus(sh)+(sh.name?'<span class="rnote" style="margin:0">'+esc(sh.name)+'</span>':'')+'</div></div>').join('')+'</div>'+
+    '<div class="toolbar" style="margin:0"><button class="btn" data-act="impstop">中止する</button></div>';
+    return h+'</div>';
+  }
+  const ok=I.sheets.filter(x=>!x.skip&&x.sid&&x.data&&x.data.days.some(d=>!d.skip));
+  const nDays=ok.reduce((a,x)=>a+x.data.days.filter(d=>!d.skip).length,0);
+  const noSid=I.sheets.filter(x=>!x.skip&&x.status!=='wait'&&!x.sid&&x.raw).length;
+  h+='<p class="lead" style="margin:0">'+I.sheets.length+'枚のうち '+ok.length+'人分を取り込めます。<span class="unsure-key">黄色</span>の欄は読み取りに自信がないところです。確認・修正してから保存してください。保存すると、それぞれの生徒の、ここに並んだ日の予定が上書きされます。</p>'+
+    (noSid?'<div class="banner" style="margin:0">生徒が決まっていない写真が'+noSid+'枚あります。「登録する生徒」を選ぶか、「この写真は取り込まない」にチェックしてください。</div>':'')+
+    '<div class="sheets">'+I.sheets.map((sh,i)=>vSheet(I,sh,i)).join('')+'</div>'+
+    (I.err?'<div class="err-msg">'+esc(I.err)+'</div>':'')+
+    '<div class="toolbar" style="margin:0"><button class="btn primary" data-act="impsave"'+(ok.length&&W()?'':' disabled')+'>この内容で保存（'+ok.length+'人・'+nDays+'日分を上書き）</button><button class="btn" data-act="impback">貼り付け直す</button><button class="btn" data-act="impcancel">やめる</button></div>';
+  return h+'</div>';
+}
+function impEdit(t){
+  const I=S.imp;if(!I||!I.sheets)return;const sh=I.sheets[Number(t.dataset.si)];if(!sh)return;
+  const f=t.dataset.imp;
+  if(f==='ssid'){sh.auto=false;setSheetStudent(sh,t.value);if(sh.data&&sh.data.days.length&&sh.status==='error'){sh.status='done';sh.err=''}render();return}
+  if(f==='sskip'){sh.skip=t.checked;render();return}
+  const d=sh.data&&sh.data.days[Number(t.dataset.di)];if(!d)return;
+  const l=d.lectures[Number(t.dataset.li)];
+  const clear=k=>{d.unsure=d.unsure.filter(x=>x!==k)};
+  if(f==='use'){d.skip=!t.checked;render()}
+  else if(f==='date'){if(t.value){d.date=t.value;clear('date');render()}}
+  else if(f==='attend'){d.attend=t.checked;clear('attend');render()}
+  else if(f==='time'){d.time=t.value;clear('time')}
+  else if(f==='lcourse'&&l){l.course=t.value;render()}
+  else if(f==='lkoma'&&l){l.koma=Math.max(0,Math.round(Number(t.value)||0));render()}
+  else if(f==='hm'){d.hm[t.dataset.u]=Math.max(0,Math.round(Number(t.value)||0));clear('hm')}
+}
+function impDay(t){const sh=S.imp?.sheets?.[Number(t.dataset.si)];return sh&&sh.data?sh.data.days[Number(t.dataset.di)]:null}
+// 1人分（1枚分）を保存
+async function saveSheet(sh){
+  const s=S.students[sh.sid],use=sh.data.days.filter(d=>!d.skip);
+  for(const d of use){
+    const old=prow(d.date,s.id)||{};
+    // 上書き：前に入っていた講座・単元は 0 にしてから、紙の内容を入れる
+    const r={attend:!!d.attend,time:d.attend?(d.time||''):'',courses:{},komas:{},hm:{}};
+    for(const k in old.courses||{})r.courses[k]=0;for(const k in old.komas||{})r.komas[k]=[];for(const k in old.hm||{})r.hm[k]=0;
+    for(const l of d.lectures){r.courses[l.course]=(r.courses[l.course]||0)+1;(r.komas[l.course]=r.komas[l.course]||[]).push(l.koma)}
+    for(const k in d.hm)r.hm[k]=d.hm[k]||0;
+    const cur=clone(S.pdays[d.date]||{date:d.date,rows:{}});cur.rows=cur.rows||{};cur.rows[s.id]=r;S.pdays[d.date]=cur;
+    if(!await writeDoc('pdays/'+d.date,{date:d.date,rows:{[s.id]:r}},true))return d.date;
+  }
+  return null;
+}
+async function saveImport(){
+  const I=S.imp;if(!I||!I.sheets)return;
+  const list=I.sheets.filter(x=>!x.skip&&x.sid&&x.data&&x.data.days.some(d=>!d.skip));
+  for(const sh of list){
+    const st=S.students[sh.sid],use=sh.data.days.filter(d=>!d.skip),dates=use.map(d=>d.date);
+    if(new Set(dates).size!==dates.length){I.err=st.name+'さんの写真に、同じ日付が2回あります。日付を確認してください。';render();return}
+    if(use.some(d=>d.lectures.some(l=>!l.course||!l.koma))){I.err=st.name+'さんの写真に、講座か講の番号が決まっていない受講があります（黄色の欄）。選び直すか「×」で消してください。';render();return}
+  }
+  I.err='';I.saving=true;
+  const saved=[];let first=null;
+  for(const sh of list){
+    const bad=await saveSheet(sh);
+    if(bad){I.err=(saved.length?saved.join('・')+'さんの分は保存しました。':'')+S.students[sh.sid].name+'さんの'+fmtDay(bad)+'から保存できませんでした。通信状況を確認して、もう一度「保存」を押してください。';I.saving=false;render();return}
+    saved.push(S.students[sh.sid].name);sh.skip=true;
+    const f=sh.data.days.filter(d=>!d.skip).map(d=>d.date).sort()[0];if(f&&(!first||f<first))first=f;
+  }
+  I.sheets.forEach(x=>x.url&&URL.revokeObjectURL(x.url));
+  S.imp=null;if(first)S.planStart=first;S.impMsg=saved.join('・')+'さん（'+saved.length+'人）の予定を保存しました。';
+  render();
+}
+
+function vPlan(){
+  if(S.imp)return '<h2>週の予定</h2>'+vImport();
+  const ws=S.planStart||(S.planStart=weekStartFor(today())),we=addDays(ws,6),list=visible(),days=rangeDays(ws,we);
+  let tl=0,te=0,ta=0;for(const s of list){const p=planTot(s.id,ws,we);tl+=p.lec;te+=p.ex;ta+=p.att}
+  const hasPrev=list.some(s=>planTot(s.id,addDays(ws,-7),addDays(ws,-1)).set);
+  let h='<h2>週の予定</h2><p class="lead">1日ごとに、登校・登校時刻・受講コマ数・高マスのステージ数の予定を入力します。予定は日付ごとに保存されるので、開始日を変えても消えません。</p>'+
+  '<div class="toolbar"><button class="btn" data-act="pweek" data-d="-7" aria-label="前の週">◀</button><input class="date" type="date" id="pDate" value="'+ws+'"><button class="btn" data-act="pweek" data-d="7" aria-label="次の週">▶</button>'+
+  '<span class="range">'+fmtDay(ws)+' 〜 '+fmtDay(we)+'</span>'+
+  '<label class="inline" style="font-size:12px;color:var(--muted)">週の始まり <select class="date" id="wsDow"'+(W()?'':' disabled')+'>'+DOW.map((d,i)=>'<option value="'+i+'"'+(Number(S.settings.weekStartDow)===i?' selected':'')+'>'+d+'曜</option>').join('')+'</select></label>'+
+  '<span class="sep"></span><button class="btn" data-act="copyplan"'+(hasPrev&&W()&&list.length?'':' disabled')+'>前の週の予定をコピー</button><button class="btn primary" data-act="impopen"'+(W()&&list.length?'':' disabled')+'>読み取り結果を貼り付け</button></div>'+(S.impMsg?'<div class="banner ok">'+esc(S.impMsg)+'</div>':'')+
+  '<div class="toolbar"><div class="totals"><span>受講予定 <b>'+tl+'</b> コマ</span><span>演習予定 <b>'+te+'</b> ステージ</span><span>登校予定 <b>'+ta+'</b> 回</span></div></div>';
+  if(!list.length)return h+emptyStudents();
+  const dis=W()?'':' disabled';
+  h+='<div class="list">'+groupByGrade(list,s=>{
+    const ps=days.map(d=>prow(d,s.id)||{});
+    const t=planTot(s.id,ws,we);
+    const head='<tr><th class="l">項目</th>'+days.map(d=>'<th'+TD(d)+'>'+fmtDay(d)+(d===today()?'<br>今日':'')+'</th>').join('')+'<th>合計</th></tr>';
+    const attRow='<tr><td class="l">登校</td>'+days.map((d,i)=>'<td'+TD(d)+'><button class="pa" data-act="patt" data-sid="'+s.id+'" data-date="'+d+'" aria-pressed="'+!!ps[i].attend+'" aria-label="'+fmtDay(d)+' 登校"'+dis+'>'+(ps[i].attend?'✓':'－')+'</button></td>').join('')+'<td class="num">'+t.att+'回</td></tr>';
+    const timeRow='<tr><td class="l">登校時刻</td>'+days.map((d,i)=>'<td'+TD(d)+'>'+(ps[i].attend?'<input type="time" class="tm" id="tm-'+s.id+'-'+d+'" data-act="ptime" data-sid="'+s.id+'" data-date="'+d+'" value="'+esc(ps[i].time||'')+'" step="300" aria-label="'+fmtDay(d)+'の登校時刻"'+dis+'>':'')+'</td>').join('')+'<td></td></tr>';
+    const numRow=(kind,id,label,note)=>{let tot=0;const cells=days.map((d,i)=>{const v=Number((kind==='c'?ps[i].courses:ps[i].hm)?.[id])||0;tot+=v;
+      return '<td'+TD(d)+'><input type="number" class="pn" min="0" max="99" inputmode="numeric" id="pn-'+kind+'-'+s.id+'-'+id+'-'+d+'" data-act="pnum" data-kind="'+kind+'" data-id="'+id+'" data-sid="'+s.id+'" data-date="'+d+'" value="'+(v||'')+'" placeholder="0" aria-label="'+esc(fmtDay(d)+' '+label)+'"'+dis+'>'+(kind==='c'&&(ps[i].komas?.[id]||[]).length?'<div class="pk">'+ps[i].komas[id].map(n=>'第'+n+'講').join(' ')+'</div>':'')+'</td>'}).join('');
+      return '<tr><td class="l">'+esc(label)+' <span class="of">'+note+'</span></td>'+cells+'<td class="num">'+tot+'</td></tr>'};
+    const cRows=(s.courses||[]).map(c=>numRow('c',c.id,'受講：'+c.name,'残'+Math.max(0,(Number(c.koma)||0)-courseDone(s,c)))).join('');
+    const hRows=sUnits(s).map(u=>numRow('h',u.id,'高マス：'+u.name,'残'+Math.max(0,u.stages-hmCleared(s,u)))).join('');
+    return '<div class="pcard"><div class="phead">'+sname(s)+'<span class="grade">'+esc(s.grade)+'</span><span class="totals"><span>受講 <b>'+t.lec+'</b></span><span>演習 <b>'+t.ex+'</b></span><span>登校 <b>'+t.att+'</b>回</span></span></div>'+
+      '<div class="tablewrap ptable"><table><thead>'+head+'</thead><tbody>'+attRow+timeRow+cRows+hRows+'</tbody></table></div></div>'}
+  )+'</div><p class="note">「残」はその講座・単元で、まだ終わっていないコマ数・ステージ数です。登校に ✓ を付けると、その日の登校時刻を入力できます。</p>';
+  return h;
+}
+function editPlan(date,sid,fn){const p=clone(prow(date,sid)||{attend:false,time:'',courses:{},hm:{}});p.courses=p.courses||{};p.hm=p.hm||{};fn(p);queueRow('pdays',date,sid,p,{date})}
+
+// --- グラフ ---
+function niceMax(v){if(v<=4)return 4;const e=Math.pow(10,Math.floor(Math.log10(v)));for(const m of [1,2,2.5,5,10])if(m*e>=v)return m*e;return 10*e}
+function barChart(items,unit){
+  const max=Math.max(0,...items.map(i=>i.v));const top=niceMax(max||1);
+  const ticks=[0,top/2,top];
+  const iMax=max>0?items.findIndex(i=>i.v===max):-1;const iLast=items.length-1;
+  let h='<div class="chart"><div class="yax">'+ticks.map(t=>'<span style="bottom:'+(t/top*100)+'%">'+(Number.isInteger(t)?t:t.toFixed(1))+'</span>').join('')+'</div><div class="plot">'+
+    ticks.slice(1).map(t=>'<div class="grid" style="bottom:'+(t/top*100)+'%"></div>').join('');
+  items.forEach((it,i)=>{const hp=(it.v/top*100);
+    h+='<div class="col'+(it.today?' today':'')+'" tabindex="0" data-tip="'+esc(it.tip)+'" style="--h:'+hp+'%"><div class="b" style="height:'+hp+'%"></div>'+((i===iMax||i===iLast)&&it.v>0?'<span class="lab">'+it.v+'</span>':'')+'</div>'});
+  h+='</div></div><div class="xax">'+items.map(i=>'<span'+(i.today?' class="istoday"':'')+'>'+esc(i.x)+'</span>').join('')+'</div>';
+  return h;
+}
+
+// --- 週次サマリー ---
+function vWeek(){
+  const ws=S.weekStart||(S.weekStart=weekStartFor(today())),we=addDays(ws,6),ps=addDays(ws,-7),pe=addDays(ws,-1);
+  const list=visible();
+  let h='<h2>週次サマリー</h2><p class="lead">開始日から7日間の実績を、予定と前の週の数字と比べます。</p>'+
+  '<div class="toolbar"><button class="btn" data-act="wweek" data-d="-7" aria-label="前の週">◀</button><input class="date" type="date" id="wDate" value="'+ws+'"><button class="btn" data-act="wweek" data-d="7" aria-label="次の週">▶</button>'+
+  '<span class="range">'+fmtDay(ws)+' 〜 '+fmtDay(we)+'　（比較：'+fmtDay(ps)+' 〜 '+fmtDay(pe)+'）</span></div>';
+  if(!list.length)return h+emptyStudents();
+  const rows=list.map(s=>{const c=stats(s.id,ws,we),p=stats(s.id,ps,pe),pl=planTot(s.id,ws,we);return {s,c,p,pl}});
+  const T=k=>rows.reduce((a,r)=>a+r.c[k],0),P=k=>rows.reduce((a,r)=>a+r.p[k],0),PL=k=>rows.reduce((a,r)=>a+r.pl[k],0);
+  const n=list.length;const anyPlan=rows.some(r=>r.pl.set);
+  const tile=(k,label,unit)=>{const c=T(k),p=P(k),pl=PL(k);return '<div class="tile"><span class="k">'+label+'</span><span class="v">'+c+'<small>'+unit+'</small></span><span class="sub">前週 <span class="num">'+p+'</span> '+delta(c,p)+'</span>'+
+    (anyPlan?'<span class="sub">予定 <span class="num">'+pl+'</span>　達成率 <span class="num">'+(pl?Math.round(c/pl*100)+'%':'—')+'</span></span><div class="meter"><i style="width:'+(pl?Math.min(100,c/pl*100):0)+'%"></i></div>':'')+'</div>'};
+  const avgC=T('lec')/n,avgP=P('lec')/n;
+  h+='<div class="tiles">'+tile('lec','総受講数','コマ')+tile('ex','総演習数','ステージ')+tile('att','総登校数','回')+
+    '<div class="tile"><span class="k">平均受講数（1人あたり）</span><span class="v">'+avgC.toFixed(1)+'<small>コマ</small></span><span class="sub">前週 <span class="num">'+avgP.toFixed(1)+'</span> '+delta(avgC,avgP,{dig:1})+'</span><span class="sub">対象 '+n+' 名</span></div></div>';
+  const days=rangeDays(ws,we);
+  h+='<div class="panel"><h3>日別の受講数（コマ）</h3>'+barChart(days.map(d=>{let l=0,a=0,e=0;for(const s of list){const r=row(d,s.id);if(!r)continue;l+=sumObj(r.courses);e+=sumObj(r.hm);if(r.attend)a++}
+    return {x:fmtDay(d),today:d===today(),v:l,tip:fmtDay(d)+'\n受講 '+l+' コマ\n演習 '+e+' ステージ\n登校 '+a+' 名'}}))+'</div>';
+  h+=summaryTable(rows,'前週',true,null,'今週');
+  return h;
+}
+// 「前 → 今」の比較セル（真ん中に増減、今の数字は太字）
+function cmp(prev,cur,o={}){const f=o.fmt||(v=>String(v));let d;
+  if(prev==null||cur==null)d='<span class="d flat">&nbsp;</span>';
+  else{let x=cur-prev;if(Math.abs(x)<1e-9)x=0;const v=Math.abs(x).toFixed(o.dig||0)+(o.unit||'');d=x>0?'<span class="d up">+'+v+'</span>':x<0?'<span class="d down">−'+v+'</span>':'<span class="d flat">±0</span>'}
+  return '<div class="cmp"><span class="pv">'+(prev==null?'—':f(prev))+'</span><span class="mid">'+d+'<span class="arr">→</span></span><b class="cv">'+(cur==null?'—':f(cur))+'</b>'+(o.plan!=null?'<span class="plan">予定 '+o.plan+'</span>':'')+'</div>'}
+function summaryTable(rows,prevLabel,withPlan,extra,curLabel){
+  const pl=(r,k)=>withPlan&&r.pl.set?r.pl[k]:null;
+  const th=t=>'<th>'+t+'<br><span class="hsub">'+prevLabel+' → '+curLabel+'</span></th>';
+  let h='<div class="tablewrap"><table class="sum"><thead><tr><th class="l">生徒</th>'+th('受講')+th('演習')+th('登校')+(extra?extra.head:'')+'<th class="l">状況</th></tr></thead><tbody>';
+  for(const r of rows){
+    const low=withPlan&&r.pl.set&&((r.pl.lec&&r.c.lec<r.pl.lec*0.5)||(r.pl.att&&r.c.att<r.pl.att*0.5));
+    const zero=r.c.lec+r.c.ex+r.c.att===0;
+    const drop=(r.c.lec<r.p.lec)&&(r.c.att<r.p.att);
+    const flag=zero||low||drop;
+    const tag=zero?'<span class="badge bad">記録なし</span>':low?'<span class="badge bad">予定の半分未満</span>':drop?'<span class="badge warn">前より減少</span>':'';
+    h+='<tr class="'+(flag?'flag':'')+'"><td class="l">'+sname(r.s)+' <span class="of">'+esc(r.s.grade)+'</span></td>'+
+      '<td>'+cmp(r.p.lec,r.c.lec,{plan:pl(r,'lec')})+'</td><td>'+cmp(r.p.ex,r.c.ex,{plan:pl(r,'ex')})+'</td><td>'+cmp(r.p.att,r.c.att,{plan:pl(r,'att')})+'</td>'+
+      (extra?extra.cell(r):'')+'<td class="l">'+tag+'</td></tr>';
+  }
+  const hp=rows.every(r=>r.p.lec!=null);
+  const sum=(k,w)=>(w==='p'&&!hp)?null:rows.reduce((a,r)=>a+r[w][k],0);
+  const psum=k=>withPlan&&rows.some(r=>r.pl.set)?rows.reduce((a,r)=>a+(r.pl.set?r.pl[k]:0),0):null;
+  h+='</tbody><tfoot><tr><td class="l">合計</td><td>'+cmp(sum('lec','p'),sum('lec','c'),{plan:psum('lec')})+'</td><td>'+cmp(sum('ex','p'),sum('ex','c'),{plan:psum('ex')})+'</td><td>'+cmp(sum('att','p'),sum('att','c'),{plan:psum('att')})+'</td>'+(extra?extra.foot:'')+'<td></td></tr></tfoot></table></div>'+
+    '<p class="note">各欄は「'+prevLabel+' → '+curLabel+'」で、真ん中の数字が増減です。'+(withPlan?'下の小さな「予定」はその週の予定です。':'')+'左端に赤い線がある行は、記録がない・予定の半分未満・受講と登校がどちらも前より減った生徒です。</p>';
+  return h;
+}
+
+// --- 月次サマリー ---
+// 日付をnか月ずらす（月末を超える日は月末にそろえる。例：3/31の1か月前→2/28）
+function shiftDate(dt,n){const [y,m,d]=dt.split('-').map(Number);const t=new Date(Date.UTC(y,m-1+n,1));const last=new Date(Date.UTC(t.getUTCFullYear(),t.getUTCMonth()+1,0)).getUTCDate();return t.getUTCFullYear()+'-'+pad(t.getUTCMonth()+1)+'-'+pad(Math.min(d,last))}
+function vMonth(){
+  const PS=periodState(),{a,b,pa,pb,hasPrev,ym,months,minD}=PS,cumA=minD;
+  const list=visible();
+  let h='<h2>月次サマリー</h2><p class="lead">期間を選ぶと、前の月の同じ日付の期間と比べます（例：10/1〜10/12 を選ぶと 9/1〜9/12 と比較）。2026年9月からの記録が対象です。</p>'+periodBar(PS);
+  if(!list.length)return h+emptyStudents();
+  const rows=list.map(s=>{const c=stats(s.id,a,b),p=hasPrev?stats(s.id,pa,pb):{lec:null,ex:null,att:null},cum=stats(s.id,cumA,b),rt=rate(s,b),prt=hasPrev?rate(s,pb):null;return {s,c,p,cum,rt,prt,pl:{set:false}}});
+  const T=k=>rows.reduce((x,r)=>x+r.c[k],0),P=k=>hasPrev?rows.reduce((x,r)=>x+r.p[k],0):null,C=k=>rows.reduce((x,r)=>x+r.cum[k],0);
+  const n=list.length;
+  const agg=key=>{let d=0,t=0;for(const r of rows){const q=r[key];if(q){d+=q.done;t+=q.tot}}return t?{done:d,tot:t,r:d/t}:null};
+  const R=agg('rt'),PR=hasPrev?agg('prt'):null;
+  const tile=(k,label,unit)=>{const c=T(k),p=P(k);return '<div class="tile"><span class="k">'+label+'</span><span class="v">'+c+'<small>'+unit+'</small></span><span class="sub">前月同期間 <span class="num">'+(p??'—')+'</span> '+delta(c,p)+'</span><span class="sub">2026年9月からの累計 <span class="num">'+C(k)+'</span> '+unit+'</span></div>'};
+  const avgC=T('lec')/n,avgP=hasPrev?P('lec')/n:null;
+  h+='<div class="tiles">'+tile('lec','総受講数','コマ')+tile('ex','総演習数','ステージ')+tile('att','総登校数','回')+
+    '<div class="tile"><span class="k">平均受講数（1人あたり）</span><span class="v">'+avgC.toFixed(1)+'<small>コマ</small></span><span class="sub">前月同期間 <span class="num">'+(avgP==null?'—':avgP.toFixed(1))+'</span> '+delta(avgC,avgP,{dig:1})+'</span><span class="sub">対象 '+n+' 名</span></div>'+
+    '<div class="tile"><span class="k">受講修了率</span><span class="v">'+(R?(R.r*100).toFixed(1):'—')+'<small>%</small></span><span class="sub">'+(hasPrev?md(pb):'比較')+'時点 <span class="num">'+(PR?pct(PR.r):'—')+'</span> '+(R&&PR?delta(R.r*100,PR.r*100,{dig:1,unit:'pt',noRate:true}):'<span class="d flat">—</span>')+'</span><span class="sub">'+(R?'<span class="num">'+R.done+' / '+R.tot+'</span> コマ':'講座が未登録です')+'</span><div class="meter"><i style="width:'+(R?R.r*100:0)+'%"></i></div></div></div>';
+  const ms=months.filter(m=>m<=ym);
+  h+='<div class="panel"><h3>月別の総受講数（コマ）</h3>'+barChart(ms.map(m=>{const [x,y]=monthRange(m);let l=0,e=0,t=0;for(const s of list){const q=stats(s.id,x,y);l+=q.lec;e+=q.ex;t+=q.att}
+    return {x:Number(m.slice(5))+'月',v:l,tip:monthLabel(m)+'\n受講 '+l+' コマ\n演習 '+e+' ステージ\n登校 '+t+' 回'}}))+'</div>';
+  const rf=v=>v.toFixed(1)+'%';
+  h+=summaryTable(rows,'前月同期間',false,{
+    head:'<th>受講修了率<br><span class="hsub">'+(hasPrev?md(pb):'比較')+'時点 → '+md(b)+'時点</span></th><th>累計受講</th>',
+    cell:r=>'<td>'+cmp(r.prt?r.prt.r*100:null,r.rt?r.rt.r*100:null,{fmt:rf,dig:1,unit:'pt'})+'</td><td class="num">'+r.cum.lec+'</td>',
+    foot:'<td>'+cmp(PR?PR.r*100:null,R?R.r*100:null,{fmt:rf,dig:1,unit:'pt'})+'</td><td class="num">'+C('lec')+'</td>'},'今期間');
+  h+='<p class="note">受講修了率 ＝ 期間の終わりの日までに受講したコマ数の合計 ÷ 取っている講座の総コマ数（アプリを使い始める前に受講済みのコマも含みます）。</p>';
+  return h;
+}
+
+// 期間（月次サマリーとランキングで共通。前月同期間と比べる）
+function periodState(){
+  const months=monthList(),minD=FIRST_MONTH+'-01';
+  if(!S.mStart||!S.mEnd){const cm=months[months.length-1];S.mStart=cm+'-01';S.mEnd=cm===curMonth()?today():monthRange(cm)[1]}
+  if(S.mStart<minD)S.mStart=minD;if(S.mEnd<S.mStart)S.mEnd=S.mStart;
+  const a=S.mStart,b=S.mEnd,pa=shiftDate(a,-1),pb=shiftDate(b,-1),hasPrev=pb>=minD,ym=b.slice(0,7);
+  const fullMonth=a.slice(8)==='01'&&b===monthRange(ym)[1]&&a.slice(0,7)===ym;
+  return {months,minD,a,b,pa,pb,hasPrev,ym,fullMonth};
+}
+function periodBar(P){const {months,minD,a,b,pa,pb,hasPrev,ym,fullMonth}=P;
+  return '<div class="toolbar"><button class="btn" data-act="mon" data-d="-1" aria-label="1か月前の期間"'+(shiftDate(a,-1)>=minD?'':' disabled')+'>◀</button>'+
+  '<input class="date" type="date" id="mStart" value="'+a+'" min="'+minD+'" aria-label="期間の始め"><span>〜</span><input class="date" type="date" id="mEnd" value="'+b+'" min="'+minD+'" aria-label="期間の終わり">'+
+  '<button class="btn" data-act="mon" data-d="1" aria-label="1か月後の期間">▶</button>'+
+  '<label class="inline" style="font-size:12px;color:var(--muted)">月まるごと <select class="date" id="mSel"><option value="">選ぶ</option>'+months.map(m=>'<option value="'+m+'"'+(fullMonth&&m===ym?' selected':'')+'>'+monthLabel(m)+'</option>').join('')+'</select></label></div>'+
+  '<div class="toolbar" style="margin-top:-6px"><span class="range">期間：'+fmtDay(a)+' 〜 '+fmtDay(b)+'（'+rangeDays(a,b).length+'日間）　'+(hasPrev?'比較：'+fmtDay(pa)+' 〜 '+fmtDay(pb):'比較：2026年9月より前のため、なし')+'</span></div>';
+}
+
+// --- ランキング ---
+// 生徒全員を段階（帯）に分けて並べる。帯は上ほど良い順。
+const INF=Infinity;
+const byRange=r=>v=>r.findIndex(([lo,hi])=>v>=lo&&v<=hi);
+function mkSec(title,note,labels,list,cls,valf,fmt,exclLabel){
+  const bands=labels.map(l=>({label:l,items:[]}));let ex=0;
+  for(const s of list){const i=cls(s);if(i<0){ex++;continue}bands[i].items.push({s,v:valf(s)})}
+  bands.forEach(b=>b.items.sort((x,y)=>y.v-x.v));
+  return {title,note,bands,ex,exclLabel,fmt};
+}
+function rankSections(list,P){
+  const {a,b,pa,pb,hasPrev}=P,C={},Pv={},PL={},R={};
+  for(const s of list){C[s.id]=stats(s.id,a,b);Pv[s.id]=hasPrev?stats(s.id,pa,pb):null;PL[s.id]=planTot(s.id,a,b);R[s.id]=rate(s,b)}
+  const n=v=>String(v);
+  const lecR=[[31,INF],[21,30],[11,20],[1,10],[0,0]],exR=[[21,INF],[11,20],[6,10],[1,5],[0,0]],attR=[[15,INF],[10,14],[5,9],[1,4],[0,0]];
+  const secs=[
+    mkSec('受講数','期間内に受講したコマ数（同じコマの繰り返しも数える）',['31コマ以上','21〜30コマ','11〜20コマ','1〜10コマ','0コマ'],list,s=>byRange(lecR)(C[s.id].lec),s=>C[s.id].lec,v=>v+'コマ',''),
+    mkSec('高マス演習数','期間内にクリアしたステージ数',['21ステージ以上','11〜20ステージ','6〜10ステージ','1〜5ステージ','0ステージ'],list,s=>sUnits(s).length?byRange(exR)(C[s.id].ex):-1,s=>C[s.id].ex,v=>v+'ステージ','高マスを受講していない'),
+    mkSec('登校日数','期間内に登校した日数',['15日以上','10〜14日','5〜9日','1〜4日','0日'],list,s=>byRange(attR)(C[s.id].att),s=>C[s.id].att,v=>v+'日',''),
+    mkSec('受講修了率',md(b)+' 時点。取っている講座の総コマ数のうち、受講が終わった割合',['100%（全講座修了）','75〜99%','50〜74%','25〜49%','0〜24%'],list,s=>R[s.id]?byRange([[100,INF],[75,99.999],[50,74.999],[25,49.999],[0,24.999]])(R[s.id].r*100):-1,s=>R[s.id]?R[s.id].r*100:0,v=>Math.floor(v)+'%','講座が未登録'),
+    mkSec('受講の予定達成率','期間内の受講コマ数 ÷ 週の予定で立てた受講コマ数',['100%以上','80〜99%','50〜79%','50%未満'],list,s=>PL[s.id].lec>0?byRange([[100,INF],[80,99.999],[50,79.999],[0,49.999]])(C[s.id].lec/PL[s.id].lec*100):-1,s=>PL[s.id].lec>0?C[s.id].lec/PL[s.id].lec*100:0,v=>Math.round(v)+'%','受講の予定が入っていない'),
+    mkSec('受講数の伸び',hasPrev?'前月同期間（'+md(pa)+'〜'+md(pb)+'）と比べた受講コマ数の増減':'比較する期間がありません（2026年9月より前）',['+5コマ以上','+1〜4コマ','変わらず','減った'],list,s=>hasPrev?byRange([[5,INF],[1,4],[0,0],[-INF,-1]])(C[s.id].lec-Pv[s.id].lec):-1,s=>hasPrev?C[s.id].lec-Pv[s.id].lec:0,v=>(v>0?'+':v<0?'−':'±')+Math.abs(v),'比較する期間がない'),
+  ];
+  for(const u of UNITS){
+    secs.push(mkSec('高マス '+u.name+'の進み具合',md(b)+' 時点（全'+u.stages+'ステージ）',['修得（修了判定に合格）','修了判定待ち','進行中','未着手'],list,
+      s=>{if(!sUnits(s).includes(u))return -1;const c=Math.min(hmCleared(s,u,b),u.stages);return hmPassed(s,u,b)?0:c>=u.stages?1:c>0?2:3},
+      s=>Math.min(hmCleared(s,u,b),u.stages),v=>v+'/'+u.stages,u.name+'を受講していない'));
+  }
+  return secs;
+}
+function secHTML(x){
+  const tot=x.bands.reduce((a,b)=>a+b.items.length,0);
+  return '<div class="panel rank"><h3>'+esc(x.title)+'</h3><p class="rnote">'+esc(x.note)+'</p>'+
+    x.bands.map((b,i)=>{const c=b.items.length;
+      return '<div class="band'+(c?'':' zero')+(i===0&&c?' top':'')+'"><span class="bl">'+esc(b.label)+'</span><div class="bc"><span class="btrack"><span class="bbar" style="width:'+(tot?c/tot*100:0)+'%"></span></span><span class="bn">'+c+'人</span></div>'+
+        (c?'<div class="names">'+b.items.map(it=>'<span class="nchip">'+sname(it.s)+'<span class="of">'+esc(x.fmt(it.v))+'</span></span>').join('')+'</div>':'')+'</div>'}).join('')+
+    (x.ex?'<p class="rnote" style="margin:8px 0 0">対象外 '+x.ex+'名（'+esc(x.exclLabel)+'）</p>':'')+'</div>';
+}
+function secText(x){
+  return '■'+x.title+'\n'+x.bands.map(b=>'・'+b.label+'：'+b.items.length+'人'+(b.items.length?'（'+b.items.map(it=>it.s.name+' '+x.fmt(it.v)).join('、')+'）':'')).join('\n')+(x.ex?'\n・対象外：'+x.ex+'名（'+x.exclLabel+'）':'');
+}
+function vRank(){
+  const P=periodState(),list=visible();
+  let h='<h2>ランキング</h2><p class="lead">選んだ期間の数字で、表示中の生徒全員を段階ごとに分けて並べます。各段階の中は数字の大きい順です。月のまとめや、声をかける生徒を探すのに使えます。</p>'+periodBar(P)+
+    '<div class="toolbar" style="margin-top:-4px"><button class="btn" data-act="rcopy"'+(list.length?'':' disabled')+'>テキストでコピー</button><span class="rnote" id="rcopyMsg" style="margin:0"></span></div>'+
+    '<textarea id="rcopyBox" class="copybox" rows="8" readonly hidden aria-label="コピー用のテキスト"></textarea>';
+  if(!list.length)return h+emptyStudents();
+  const secs=rankSections(list,P);
+  S.rankText='【ランキング】'+fmtDay(P.a)+'〜'+fmtDay(P.b)+'（対象 '+list.length+'名）\n\n'+secs.map(secText).join('\n\n');
+  return h+'<div class="rgrid">'+secs.map(secHTML).join('')+'</div>';
+}
+
+// --- 生徒 ---
+function blankStudent(){const hb={};UNITS.forEach(u=>hb[u.id]={cleared:0,passed:false});return {name:'',grade:'高1',school:'',memo:'',archived:false,courses:[{id:uid('c'),name:'',koma:20,baseDone:0}],hmBase:hb,hmUnits:Object.fromEntries(UNITS.map(u=>[u.id,false]))}}
+function vStudents(){
+  let h='<h2>生徒</h2><p class="lead">生徒の名前と、受講している講座を登録します。アプリを使い始める前の進み具合も入れておくと、受講修了率と高マスの進み具合が正しく出ます。</p>';
+  if(S.editing)return h+vEditor();
+  if(S.reorder)return h+vReorder();
+  h+='<div class="toolbar"><button class="btn primary" data-act="new"'+(W()?'':' disabled')+'>＋ 生徒を追加</button><button class="btn" data-act="reorder"'+(W()&&allStudents().some(s=>!s.archived)?'':' disabled')+'>並び順を変える</button><span class="sep"></span><label class="inline"><input type="checkbox" id="showArch"'+(S.showArchived?' checked':'')+'> 非表示にした生徒も出す</label></div>';
+  const list=allStudents().filter(s=>(S.showArchived||!s.archived)&&(S.grade==='all'||s.grade===S.grade)&&(!S.q||String(s.name).includes(S.q)));
+  if(!S.loaded.students)return h+'<div class="empty"><b>読み込み中…</b></div>';
+  if(!list.length)return h+(allStudents().length?'<div class="empty"><b>条件に合う生徒がいません</b></div>':'<div class="empty"><b>まだ生徒が登録されていません</b><span>「＋ 生徒を追加」から、1人目を登録してください。</span></div>');
+  h+='<div class="cards">'+list.map(s=>{
+    const cs=(s.courses||[]).map(c=>{const d=Math.min(courseDone(s,c),Number(c.koma)||0),k=Number(c.koma)||0;return '<span class="n" title="'+esc(c.name)+'">'+esc(c.name||'（講座名なし）')+'</span><span class="c">'+d+'/'+k+'</span><div class="meter"><i style="width:'+(k?d/k*100:0)+'%"></i></div>'}).join('');
+    const hs=sUnits(s).map(u=>{const c=Math.min(hmCleared(s,u),u.stages),p=hmPassed(s,u);return '<span class="n">'+u.name+(p?' <span class="badge">修得</span>':c>=u.stages?' <span class="badge warn">修了判定待ち</span>':'')+'</span><span class="c">'+c+'/'+u.stages+'</span><div class="meter hm"><i style="width:'+(c/u.stages*100)+'%"></i></div>'}).join('');
+    const rt=rate(s);
+    return '<div class="card'+(s.archived?' arch':'')+'"><div class="h">'+sname(s)+'<span class="grade">'+esc(s.grade)+(s.school?'・'+esc(s.school):'')+(s.archived?'・非表示':'')+'</span><button class="btn" data-act="edit" data-sid="'+s.id+'"'+(W()?'':' disabled')+'>編集</button></div>'+
+      '<div class="sub-h">受講　'+(rt?'修了率 '+pct(rt.r):'')+'</div><div class="prog">'+(cs||'<span class="none">講座が未登録です</span>')+'</div>'+
+      '<div class="sub-h">高マス</div><div class="prog">'+(hs||'<span class="none">受講していません</span>')+'</div>'+(s.memo?'<div class="memo">'+esc(s.memo)+'</div>':'')+'</div>'}).join('')+'</div>';
+  return h;
+}
+function vEditor(){
+  const e=S.editing;
+  return '<div class="editor"><h3>'+(e.id?'生徒を編集':'生徒を追加')+'</h3>'+
+  '<div class="fgrid"><label class="field"><span>名前</span><input id="e-name" data-f="name" value="'+esc(e.name)+'" autocomplete="off"></label>'+
+  '<label class="field"><span>学年</span><select id="e-grade" data-f="grade">'+GRADES.map(g=>'<option'+(e.grade===g?' selected':'')+'>'+g+'</option>').join('')+'</select></label>'+
+  '<label class="field"><span>高校名</span><input id="e-school" data-f="school" value="'+esc(e.school||'')+'" placeholder="例：〇〇高校" autocomplete="off"></label></div>'+
+  '<div class="field"><span>名前の色</span><div class="swatches" role="group" aria-label="名前の色"><button type="button" class="sw none" data-act="color" data-c="" aria-pressed="'+!e.color+'">なし</button>'+COLORS.map(c=>'<button type="button" class="sw" data-act="color" data-c="'+c.id+'" style="--c:var(--sc-'+c.id+')" aria-pressed="'+(e.color===c.id)+'" title="'+c.name+'" aria-label="'+c.name+'"></button>').join('')+'</div><div class="preview">表示の見本：'+sname({name:e.name||'名前',color:e.color})+'</div></div>'+
+  '<div class="sub-h">受講している講座</div>'+
+  e.courses.map((c,i)=>'<div class="crow"><label class="field"><span>講座名</span><input id="e-cn-'+c.id+'" data-c="'+i+'" data-k="name" value="'+esc(c.name)+'" autocomplete="off"></label>'+
+    '<label class="field"><span>総コマ数</span><input id="e-ck-'+c.id+'" type="number" min="1" inputmode="numeric" data-c="'+i+'" data-k="koma" value="'+c.koma+'"></label>'+
+    '<label class="field"><span>開始前の受講済み</span><input id="e-cb-'+c.id+'" type="number" min="0" inputmode="numeric" data-c="'+i+'" data-k="baseDone" value="'+(c.baseDone||0)+'"></label>'+
+    '<button class="btn ghost" data-act="delcourse" data-i="'+i+'">外す</button>'+
+    '<label class="inline cfin"><input id="e-cf-'+c.id+'" type="checkbox" data-c="'+i+'" data-k="finished"'+(c.finished?' checked':'')+'> 修得済み</label><span class="rnote cfin" style="margin:0">科目：'+esc(subjectOf(c.name)||'未分類')+'</span></div>').join('')+
+  '<div><button class="btn" data-act="addcourse">＋ 講座を追加</button></div>'+
+  '<div class="sub-h">高マス（受講する単元にチェック。進み具合はアプリを使い始める前の状況）</div>'+
+  UNITS.map(u=>{const on=!!e.hmUnits[u.id];return '<div class="hrow"><label class="inline"><input id="e-hu-'+u.id+'" type="checkbox" data-hu="'+u.id+'"'+(on?' checked':'')+'> <b>'+u.name+'</b></label>'+(on?'<label class="inline"><input id="e-hc-'+u.id+'" type="number" min="0" max="'+u.stages+'" inputmode="numeric" data-h="'+u.id+'" data-k="cleared" value="'+(e.hmBase[u.id]?.cleared||0)+'" style="width:64px" class="date"> / '+u.stages+' ステージ</label><label class="inline"><input id="e-hp-'+u.id+'" type="checkbox" data-h="'+u.id+'" data-k="passed"'+(e.hmBase[u.id]?.passed?' checked':'')+'> 修了判定 合格済み</label>':'<span class="none">受講しない</span>')+'</div>'}).join('')+
+  '<label class="field"><span>メモ</span><textarea id="e-memo" rows="2" data-f="memo">'+esc(e.memo)+'</textarea></label>'+
+  (e.id?'<label class="inline"><input id="e-arch" type="checkbox" data-f="archived"'+(e.archived?' checked':'')+'> 非表示にする（退塾・卒業など。記録は消えません）</label>':'')+
+  (S.editErr?'<div class="err-msg">'+esc(S.editErr)+'</div>':'')+
+  '<div class="toolbar"><button class="btn primary" data-act="save">保存する</button><button class="btn" data-act="cancel">やめる</button></div></div>';
+}
+function vReorder(){
+  const r=S.reorder,n=r.length;
+  return '<div class="editor"><h3>並び順を変える</h3><p class="lead" style="margin:0">↑↓で1つずつ、「先頭」「末尾」で一気に動かせます。並び順を変えても、生徒ごとの記録はそのまま変わりません。「この順で保存」を押すと、すべての画面がこの順になります。</p>'+
+  '<div class="toolbar" style="margin:0"><button class="btn primary" data-act="rsave">この順で保存</button><button class="btn" data-act="rcancel">やめる</button></div>'+
+  (S.reorderErr?'<div class="err-msg">'+esc(S.reorderErr)+'</div>':'')+
+  '<div class="rlist">'+r.map((id,i)=>{const s=S.students[id];if(!s)return '';return '<div class="rrow"><span class="no">'+(i+1)+'</span><span class="nm">'+sname(s)+' <span class="grade">'+esc(s.grade)+'</span></span><span class="rbtns">'+
+    '<button data-act="mv" data-i="'+i+'" data-to="top"'+(i?'':' disabled')+' aria-label="'+esc(s.name)+'を先頭へ">先頭</button>'+
+    '<button data-act="mv" data-i="'+i+'" data-d="-1"'+(i?'':' disabled')+' aria-label="'+esc(s.name)+'を1つ上へ">↑</button>'+
+    '<button data-act="mv" data-i="'+i+'" data-d="1"'+(i<n-1?'':' disabled')+' aria-label="'+esc(s.name)+'を1つ下へ">↓</button>'+
+    '<button data-act="mv" data-i="'+i+'" data-to="end"'+(i<n-1?'':' disabled')+' aria-label="'+esc(s.name)+'を末尾へ">末尾</button></span></div>'}).join('')+'</div>'+
+  '<div class="toolbar" style="margin:0"><button class="btn primary" data-act="rsave">この順で保存</button><button class="btn" data-act="rcancel">やめる</button></div></div>';
+}
+// 並び順の保存：各生徒の order だけを書き換える（名前・講座・記録には触れない）
+async function saveOrder(){
+  const ids=[...S.reorder.filter(id=>S.students[id]),...allStudents().filter(s=>s.archived).map(s=>s.id)];
+  let ok=true;
+  for(let i=0;i<ids.length;i++){
+    const id=ids[i],s=S.students[id];if(!s||Number(s.order)===i+1)continue;
+    const done=await writeDoc('students/'+id,{order:i+1},true);
+    if(!done){ok=false;break}
+    S.students[id]={...S.students[id],order:i+1};
+  }
+  if(ok){S.reorder=null;S.reorderErr=''}else S.reorderErr='途中で保存できなくなりました。通信状況を確認して、もう一度「この順で保存」を押してください（記録は消えていません）。';
+  render();
+}
+async function saveStudent(){
+  const e=S.editing;
+  if(!e.name.trim()){S.editErr='名前を入力してください。';render();return}
+  const courses=e.courses.filter(c=>c.name.trim()).map(c=>({id:c.id,name:c.name.trim(),koma:Math.max(1,Math.round(Number(c.koma)||20)),baseDone:Math.max(0,Math.round(Number(c.baseDone)||0)),finished:!!c.finished}));
+  for(const c of courses)if(c.baseDone>c.koma){S.editErr='「'+c.name+'」の受講済みコマが総コマ数より多くなっています。';render();return}
+  const hb={};UNITS.forEach(u=>{const x=e.hmBase[u.id]||{};hb[u.id]={cleared:Math.min(u.stages,Math.max(0,Math.round(Number(x.cleared)||0))),passed:!!x.passed}});
+  const data={name:e.name.trim(),grade:e.grade,school:(e.school||'').trim(),memo:e.memo||'',archived:!!e.archived,courses,hmBase:hb,hmUnits:Object.fromEntries(UNITS.map(u=>[u.id,!!e.hmUnits[u.id]])),color:e.color||''};
+  const id=e.id||uid('s');
+  data.createdAt=e.id?orderKey(e):Date.now();
+  const ord=e.id?(S.students[e.id]?.order??null):nextOrder();if(ord!=null)data.order=ord;
+  const ok=await writeDoc('students/'+id,data,false);
+  if(ok){S.students[id]={id,...data};S.editing=null;S.editErr='';render()}
+  else{S.editErr='保存できませんでした。通信状況を確認して、もう一度「保存する」を押してください。';render()}
+}
+
+// ===== 操作 =====
+document.getElementById('tabs').addEventListener('click',ev=>{const b=ev.target.closest('button[data-tab]');if(!b)return;S.tab=b.dataset.tab;try{localStorage.setItem('sn-tab',S.tab)}catch(e){}render()});
+document.addEventListener('click',ev=>{
+  const t=ev.target.closest('[data-act]');if(!t||t.tagName==='INPUT')return;
+  const a=t.dataset.act,sid=t.dataset.sid,id=t.dataset.id,d=Number(t.dataset.d);
+  switch(a){
+    case 'grade':S.grade=t.dataset.g;try{localStorage.setItem('sn-grade',S.grade)}catch(e){}render();break;
+    case 'goto':S.tab=t.dataset.tab;try{localStorage.setItem('sn-tab',S.tab)}catch(e){}render();break;
+    case 'day':S.date=addDays(S.date,d);render();break;
+    case 'today':S.date=today();render();break;
+    case 'att':editDay(sid,r=>{r.attend=!r.attend});break;
+    case 'dc':editDay(sid,r=>{const n=(r.komas?.[id]||[]).length;r.courses[id]=Math.max(n,(Number(r.courses[id])||0)+d)});break;
+    case 'kadd':{const sel=document.getElementById('ks-'+sid+'-'+id);const n=Number(sel&&sel.value);if(!n)break;delete S.kpick[sid+'|'+id];
+      editDay(sid,r=>{r.komas=r.komas||{};r.komas[id]=[...(r.komas[id]||[]),n];r.courses[id]=(Number(r.courses[id])||0)+1});break}
+    case 'kdel':{const i=Number(t.dataset.i);editDay(sid,r=>{r.komas=r.komas||{};const a=[...(r.komas[id]||[])];if(i<0||i>=a.length)return;a.splice(i,1);r.komas[id]=a;r.courses[id]=Math.max(0,(Number(r.courses[id])||0)-1)});break}
+    case 'dh':editDay(sid,r=>{r.hm[id]=Math.max(0,(Number(r.hm[id])||0)+d)});break;
+    case 'pweek':S.impMsg='';S.planStart=addDays(S.planStart,d);render();break;
+    case 'patt':editPlan(t.dataset.date,sid,p=>{p.attend=!p.attend});break;
+    case 'copyplan':copyPlan();break;
+    case 'wweek':S.weekStart=addDays(S.weekStart,d);render();break;
+    case 'mon':{const e=S.mEnd===monthRange(S.mEnd.slice(0,7))[1]?monthRange(shiftDate(S.mEnd,d).slice(0,7))[1]:shiftDate(S.mEnd,d);S.mStart=shiftDate(S.mStart,d);S.mEnd=e;render();break}
+    case 'new':S.editing=blankStudent();S.editErr='';render();setTimeout(()=>document.getElementById('e-name')?.focus(),0);break;
+    case 'edit':{const s=S.students[sid];const e=clone(s);e.courses=e.courses||[];e.hmBase=e.hmBase||{};UNITS.forEach(u=>e.hmBase[u.id]=e.hmBase[u.id]||{cleared:0,passed:false});e.hmUnits=Object.fromEntries(UNITS.map(u=>[u.id,!s.hmUnits||!!s.hmUnits[u.id]]));S.editing=e;S.editErr='';render();window.scrollTo({top:0});break}
+    case 'addcourse':S.editing.courses.push({id:uid('c'),name:'',koma:20,baseDone:0});render();break;
+    case 'delcourse':S.editing.courses.splice(Number(t.dataset.i),1);render();break;
+    case 'save':saveStudent();break;
+    case 'color':S.editing.color=t.dataset.c;render();break;
+    case 'cancel':S.editing=null;S.editErr='';render();break;
+    case 'reorder':S.reorder=allStudents().filter(s=>!s.archived).map(s=>s.id);S.reorderErr='';render();window.scrollTo({top:0});break;
+    case 'mv':{const i=Number(t.dataset.i),r=S.reorder,j=t.dataset.to==='top'?0:t.dataset.to==='end'?r.length-1:i+d;if(j<0||j>=r.length||j===i)break;const [x]=r.splice(i,1);r.splice(j,0,x);render();break}
+    case 'rsave':saveOrder();break;
+    case 'impopen':{S.impMsg='';S.imp={step:'pick',sid:'',files:[],sheets:[],err:'',paste:''};render();window.scrollTo({top:0});break}
+    case 'impfdel':{const I=S.imp;if(I){const [f]=I.files.splice(Number(t.dataset.i),1);if(f)URL.revokeObjectURL(f.url);render()}break}
+    case 'impread':runImport();break;
+    case 'impstop':if(S.imp&&S.imp.ctl)S.imp.ctl.abort();break;
+    case 'impback':if(S.imp){if(S.imp.ctl)S.imp.ctl.abort();S.imp.step='pick';S.imp.sheets=[];S.imp.err='';render()}break;
+    case 'impcancel':if(S.imp){if(S.imp.ctl)S.imp.ctl.abort();S.imp.files.forEach(f=>URL.revokeObjectURL(f.url))}S.imp=null;render();break;
+    case 'impsave':saveImport();break;
+    case 'impladd':{const d=impDay(t);if(d){d.lectures.push({raw:'',course:'',koma:0});render()}break}
+    case 'impldel':{const d=impDay(t);if(d){d.lectures.splice(Number(t.dataset.li),1);render()}break}
+    case 'rcopy':{const txt=S.rankText||'',msg=document.getElementById('rcopyMsg'),box=document.getElementById('rcopyBox');
+      const fallback=()=>{box.hidden=false;box.value=txt;box.focus();box.select();msg.textContent='下の文字を選んでコピーしてください'};
+      try{navigator.clipboard.writeText(txt).then(()=>{msg.textContent='コピーしました。LINEやメモに貼り付けられます'},fallback)}catch(e){fallback()}break}
+    case 'rcancel':S.reorder=null;render();break;
+  }
+});
+document.addEventListener('change',ev=>{
+  const t=ev.target;
+  if(t.dataset.imp){impEdit(t);return}
+  if(t.id==='impFile'&&S.imp){const I=S.imp,fs=[...(t.files||[])];const room=IMP_MAX-I.files.length;
+    fs.slice(0,Math.max(0,room)).forEach(f=>I.files.push({file:f,url:URL.createObjectURL(f)}));
+    I.err=fs.length>room?'写真は'+IMP_MAX+'枚までです。最初の'+Math.max(0,room)+'枚だけ追加しました。':'';render();return}
+  if(t.id==='impSid'&&S.imp){S.imp.sid=t.value;render();return}
+  if(t.id==='dDate'&&t.value){S.date=t.value;render()}
+  else if(t.id==='pDate'&&t.value){S.planStart=t.value;render()}
+  else if(t.id==='wDate'&&t.value){S.weekStart=t.value;render()}
+  else if(t.id==='mSel'){if(t.value){const [x,y]=monthRange(t.value);S.mStart=x;S.mEnd=y;render()}}
+  else if(t.id==='mStart'&&t.value){S.mStart=t.value;if(S.mEnd<S.mStart)S.mEnd=S.mStart;render()}
+  else if(t.id==='mEnd'&&t.value){S.mEnd=t.value;if(S.mEnd<S.mStart)S.mStart=S.mEnd;render()}
+  else if(t.dataset.kpick){S.kpick[t.dataset.kpick]=t.value}
+  else if(t.id==='showArch'){S.showArchived=t.checked;render()}
+  else if(t.id==='wsDow'){const w=Number(t.value);S.settings={...S.settings,weekStartDow:w};S.planStart=weekStartFor(S.planStart||today());S.weekStart=null;writeDoc('settings/main',{weekStartDow:w},true);render()}
+  else if(t.dataset.act==='ptime'){const {sid,date}=t.dataset;editPlan(date,sid,p=>{p.time=t.value})}
+  else if(t.dataset.act==='pnum'){const {sid,date,kind,id}=t.dataset;const n=Math.max(0,Math.min(99,Math.round(Number(t.value)||0)));editPlan(date,sid,p=>{(kind==='c'?p.courses:p.hm)[id]=n;if(kind==='c'&&p.komas&&(p.komas[id]||[]).length>n)p.komas[id]=p.komas[id].slice(0,n)})}
+  else if(t.dataset.act==='final'){const {sid,id}=t.dataset;editDay(sid,r=>{r.final[id]=t.checked})}
+  else if(t.dataset.k==='finished'&&t.dataset.c!=null&&S.editing){S.editing.courses[Number(t.dataset.c)].finished=t.checked}
+  else if(t.dataset.hu&&S.editing){S.editing.hmUnits[t.dataset.hu]=t.checked;render()}
+  else if(t.dataset.k==='passed'&&t.dataset.h&&S.editing){S.editing.hmBase[t.dataset.h].passed=t.checked}
+  else if(t.dataset.f==='archived'&&S.editing){S.editing.archived=t.checked}
+  else if(t.dataset.f==='grade'&&S.editing){S.editing.grade=t.value}
+});
+document.addEventListener('input',ev=>{
+  const t=ev.target;
+  if(t.id==='impPaste'&&S.imp){S.imp.paste=t.value;return}
+  if(t.id==='q'){S.q=t.value.trim();const pos=t.selectionStart;render();const q=document.getElementById('q');if(q){q.focus();try{q.setSelectionRange(pos,pos)}catch(e){}}return}
+  if(!S.editing)return;
+  if(t.dataset.f&&t.dataset.f!=='archived')S.editing[t.dataset.f]=t.value;
+  else if(t.dataset.c!=null)S.editing.courses[Number(t.dataset.c)][t.dataset.k]=t.value;
+  else if(t.dataset.h&&t.dataset.k==='cleared')S.editing.hmBase[t.dataset.h].cleared=t.value;
+});
+async function copyPlan(){
+  const ws=S.planStart,list=visible();
+  for(let i=0;i<7;i++){
+    const src=S.pdays[addDays(ws,i-7)],dst=addDays(ws,i);if(!src)continue;
+    const rows={};for(const s of list){const p=src.rows?.[s.id];if(p)rows[s.id]=clone(p)}
+    if(!Object.keys(rows).length)continue;
+    const cur=clone(S.pdays[dst]||{date:dst,rows:{}});cur.rows={...(cur.rows||{}),...rows};S.pdays[dst]=cur;render();
+    await writeDoc('pdays/'+dst,{date:dst,rows},true);
+  }
+}
+
+// ツールチップ
+const tip=document.getElementById('tip');
+function showTip(el,x,y){tip.textContent=el.dataset.tip;tip.style.whiteSpace='pre-line';tip.hidden=false;const w=tip.offsetWidth,h=tip.offsetHeight;tip.style.left=Math.min(window.innerWidth-w-8,Math.max(8,x-w/2))+'px';tip.style.top=Math.max(8,y-h-12)+'px'}
+document.addEventListener('pointermove',ev=>{const c=ev.target.closest&&ev.target.closest('.col[data-tip]');if(c)showTip(c,ev.clientX,ev.clientY);else tip.hidden=true});
+document.addEventListener('focusin',ev=>{const c=ev.target.closest&&ev.target.closest('.col[data-tip]');if(c){const r=c.getBoundingClientRect();showTip(c,r.left+r.width/2,r.top+20)}else tip.hidden=true});
+
+// ヘッダーの高さを測って、日付の操作欄をその真下に固定する
+(()=>{const hd=document.querySelector('header.top');const set=()=>document.documentElement.style.setProperty('--hh',hd.offsetHeight+'px');set();try{new ResizeObserver(set).observe(hd)}catch(e){window.addEventListener('resize',set)}})();
+
+// ===== 接続 =====
+render();
+// ===== Firebase =====
+// 合言葉は共有アカウントのパスワードとして使う（コードには書かない）
+const STAFF_EMAIL='staff@example.com';
+// Firestore を、これまでの保存のしかた（doc / collection / onSnapshot）に合わせて包む
+function fsAdapter(fs){
+  const snapDoc=x=>({id:x.id,exists:x.exists,data:()=>x.data(),metadata:x.metadata});
+  const wrapDoc=ref=>({id:ref.id,path:ref.path,
+    get:()=>ref.get().then(snapDoc),
+    set:d=>ref.set(d),
+    update:d=>ref.set(d,{merge:true}),   // 入れ子の項目は残して、書いた項目だけ更新
+    delete:()=>ref.delete(),
+    onSnapshot:(n,e)=>ref.onSnapshot(x=>n(snapDoc(x)),e)});
+  return {doc:p=>wrapDoc(fs.doc(p)),
+    collection:p=>({onSnapshot:(n,e)=>fs.collection(p).onSnapshot(q=>n({docs:q.docs.map(snapDoc),size:q.size,empty:q.empty}),e)})};
+}
+let started=false;
+function startData(fs){
+  if(started)return;started=true;
+  const db=fsAdapter(fs);
+  S.db=db;S.dbChecked=true;S.canWrite=true;setSave('idle');
+  const onErr=e=>{setSave('error','読み込みに失敗しました（開き直してください）')};
+  db.collection('students').onSnapshot(snap=>{const o={};snap.docs.forEach(d=>{o[d.id]={id:d.id,...clone(d.data())}});S.students=o;S.loaded.students=true;render()},onErr);
+  db.collection('days').onSnapshot(snap=>{const o={};snap.docs.forEach(d=>{o[d.id]=d.data()});S.days=o;overlay('days');S.loaded.days=true;render()},onErr);
+  db.collection('pdays').onSnapshot(snap=>{const o={};snap.docs.forEach(d=>{o[d.id]=d.data()});S.pdays=o;overlay('pdays');S.loaded.plans=true;render()},onErr);
+  db.doc('settings/main').onSnapshot(d=>{if(d.exists){const w=d.data().weekStartDow;if(w!=null&&w!==S.settings.weekStartDow){S.settings={...S.settings,weekStartDow:w}}}render()},onErr);
+}
+(()=>{
+  const gate=document.getElementById('gate'),form=document.getElementById('gateForm'),msg=document.getElementById('gateMsg'),btn=document.getElementById('gateBtn');
+  if(!window.firebase||!window.FIREBASE_CONFIG){msg.textContent='準備中です。管理者の設定が終わるまでお待ちください。';btn.disabled=true;return}
+  firebase.initializeApp(window.FIREBASE_CONFIG);
+  const auth=firebase.auth(),fs=firebase.firestore();
+  try{fs.enablePersistence({synchronizeTabs:true}).catch(()=>{})}catch(e){}
+  auth.onAuthStateChanged(u=>{
+    if(u){gate.hidden=true;document.body.classList.remove('locked');startData(fs)}
+    else{gate.hidden=false;document.body.classList.add('locked');btn.disabled=false;msg.textContent='';setTimeout(()=>document.getElementById('gatePass').focus(),0)}
+  });
+  form.addEventListener('submit',async ev=>{ev.preventDefault();
+    const pass=document.getElementById('gatePass').value;if(!pass)return;
+    btn.disabled=true;msg.textContent='確認しています…';
+    try{await auth.signInWithEmailAndPassword(STAFF_EMAIL,pass)}
+    catch(e){btn.disabled=false;msg.textContent=(e&&(e.code==='auth/too-many-requests'))?'何度も間違えたため、しばらく入れません。時間をおいてから試してください。':(e&&e.code==='auth/network-request-failed')?'通信できませんでした。電波の良い場所で試してください。':'合言葉が違います。'}
+  });
+  document.getElementById('logout').addEventListener('click',()=>{auth.signOut().then(()=>location.reload())});
+})();
+// ホーム画面アプリ：オフラインでも画面が開くように
+if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+</script>
+</body>
+</html>
