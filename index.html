@@ -481,8 +481,15 @@ function render(){
   document.querySelectorAll('#tabs button').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===S.tab)));
   renderBanner();renderFilters();
   const fn={daily:vDaily,plan:vPlan,week:vWeek,month:vMonth,rank:vRank,students:vStudents}[S.tab]||vDaily;
+  const y=window.scrollY;
   v.innerHTML=fn();
+  if(Math.abs(window.scrollY-y)>1)window.scrollTo(0,y);
 }
+// 編集・並べ替え・貼り付けを開く前の位置を覚えておき、閉じたら同じ位置に戻す
+function rememberScroll(){S.backY=window.scrollY}
+function restoreScroll(){const y=S.backY;S.backY=null;if(y!=null)requestAnimationFrame(()=>requestAnimationFrame(()=>window.scrollTo(0,y)))}
+// 日本語入力の変換が終わったら絞り込む
+document.addEventListener('compositionend',ev=>{if(ev.target.id==='q'){S.q=ev.target.value.trim();render()}});
 document.addEventListener('focusout',()=>setTimeout(()=>{if(deferred)render()},0));
 
 function renderBanner(){
@@ -495,6 +502,10 @@ function renderFilters(){
   const f=document.getElementById('filters');
   if((S.tab==='students'&&(S.editing||S.reorder))||(S.tab==='plan'&&S.imp)){f.innerHTML='';return}
   const n=visible().length;
+  if(document.getElementById('q')){
+    f.querySelectorAll('.chip').forEach(b=>b.setAttribute('aria-pressed',String(S.grade===b.dataset.g)));
+    f.querySelector('.fcount b').textContent=n;return;
+  }
   f.innerHTML='<div class="chips" role="group" aria-label="学年">'+['all',...GRADES].map(g=>'<button class="chip" data-act="grade" data-g="'+g+'" aria-pressed="'+(S.grade===g)+'">'+(g==='all'?'全員':g)+'</button>').join('')+'</div>'+
     '<input class="search" id="q" type="search" placeholder="名前で絞り込み" value="'+esc(S.q)+'" aria-label="名前で絞り込み">'+
     '<span class="fcount">表示中 <b class="num">'+n+'</b> 名</span>';
@@ -765,7 +776,7 @@ async function saveImport(){
     const f=sh.data.days.filter(d=>!d.skip).map(d=>d.date).sort()[0];if(f&&(!first||f<first))first=f;
   }
   I.sheets.forEach(x=>x.url&&URL.revokeObjectURL(x.url));
-  S.imp=null;if(first)S.planStart=first;S.impMsg=saved.join('・')+'さん（'+saved.length+'人）の予定を保存しました。';
+  S.imp=null;S.backY=null;if(first)S.planStart=first;S.impMsg=saved.join('・')+'さん（'+saved.length+'人）の予定を保存しました。';
   render();
 }
 
@@ -1024,7 +1035,7 @@ async function saveOrder(){
     if(!done){ok=false;break}
     S.students[id]={...S.students[id],order:i+1};
   }
-  if(ok){S.reorder=null;S.reorderErr=''}else S.reorderErr='途中で保存できなくなりました。通信状況を確認して、もう一度「この順で保存」を押してください（記録は消えていません）。';
+  if(ok){S.reorder=null;S.reorderErr='';render();restoreScroll();return}else S.reorderErr='途中で保存できなくなりました。通信状況を確認して、もう一度「この順で保存」を押してください（記録は消えていません）。';
   render();
 }
 async function saveStudent(){
@@ -1038,7 +1049,7 @@ async function saveStudent(){
   data.createdAt=e.id?orderKey(e):Date.now();
   const ord=e.id?(S.students[e.id]?.order??null):nextOrder();if(ord!=null)data.order=ord;
   const ok=await writeDoc('students/'+id,data,false);
-  if(ok){S.students[id]={id,...data};S.editing=null;S.editErr='';render()}
+  if(ok){S.students[id]={id,...data};S.editing=null;S.editErr='';render();restoreScroll()}
   else{S.editErr='保存できませんでした。通信状況を確認して、もう一度「保存する」を押してください。';render()}
 }
 
@@ -1063,29 +1074,29 @@ document.addEventListener('click',ev=>{
     case 'copyplan':copyPlan();break;
     case 'wweek':S.weekStart=addDays(S.weekStart,d);render();break;
     case 'mon':{const e=S.mEnd===monthRange(S.mEnd.slice(0,7))[1]?monthRange(shiftDate(S.mEnd,d).slice(0,7))[1]:shiftDate(S.mEnd,d);S.mStart=shiftDate(S.mStart,d);S.mEnd=e;render();break}
-    case 'new':S.editing=blankStudent();S.editErr='';render();setTimeout(()=>document.getElementById('e-name')?.focus(),0);break;
-    case 'edit':{const s=S.students[sid];const e=clone(s);e.courses=e.courses||[];e.hmBase=e.hmBase||{};UNITS.forEach(u=>e.hmBase[u.id]=e.hmBase[u.id]||{cleared:0,passed:false});e.hmUnits=Object.fromEntries(UNITS.map(u=>[u.id,!s.hmUnits||!!s.hmUnits[u.id]]));S.editing=e;S.editErr='';render();window.scrollTo({top:0});break}
+    case 'new':rememberScroll();S.editing=blankStudent();S.editErr='';render();setTimeout(()=>document.getElementById('e-name')?.focus(),0);break;
+    case 'edit':{rememberScroll();const s=S.students[sid];const e=clone(s);e.courses=e.courses||[];e.hmBase=e.hmBase||{};UNITS.forEach(u=>e.hmBase[u.id]=e.hmBase[u.id]||{cleared:0,passed:false});e.hmUnits=Object.fromEntries(UNITS.map(u=>[u.id,!s.hmUnits||!!s.hmUnits[u.id]]));S.editing=e;S.editErr='';render();window.scrollTo({top:0});break}
     case 'addcourse':S.editing.courses.push({id:uid('c'),name:'',koma:20,baseDone:0});render();break;
     case 'delcourse':S.editing.courses.splice(Number(t.dataset.i),1);render();break;
     case 'save':saveStudent();break;
     case 'color':S.editing.color=t.dataset.c;render();break;
-    case 'cancel':S.editing=null;S.editErr='';render();break;
-    case 'reorder':S.reorder=allStudents().filter(s=>!s.archived).map(s=>s.id);S.reorderErr='';render();window.scrollTo({top:0});break;
+    case 'cancel':S.editing=null;S.editErr='';render();restoreScroll();break;
+    case 'reorder':rememberScroll();S.reorder=allStudents().filter(s=>!s.archived).map(s=>s.id);S.reorderErr='';render();window.scrollTo({top:0});break;
     case 'mv':{const i=Number(t.dataset.i),r=S.reorder,j=t.dataset.to==='top'?0:t.dataset.to==='end'?r.length-1:i+d;if(j<0||j>=r.length||j===i)break;const [x]=r.splice(i,1);r.splice(j,0,x);render();break}
     case 'rsave':saveOrder();break;
-    case 'impopen':{S.impMsg='';S.imp={step:'pick',sid:'',files:[],sheets:[],err:'',paste:''};render();window.scrollTo({top:0});break}
+    case 'impopen':{rememberScroll();S.impMsg='';S.imp={step:'pick',sid:'',files:[],sheets:[],err:'',paste:''};render();window.scrollTo({top:0});break}
     case 'impfdel':{const I=S.imp;if(I){const [f]=I.files.splice(Number(t.dataset.i),1);if(f)URL.revokeObjectURL(f.url);render()}break}
     case 'impread':runImport();break;
     case 'impstop':if(S.imp&&S.imp.ctl)S.imp.ctl.abort();break;
     case 'impback':if(S.imp){if(S.imp.ctl)S.imp.ctl.abort();S.imp.step='pick';S.imp.sheets=[];S.imp.err='';render()}break;
-    case 'impcancel':if(S.imp){if(S.imp.ctl)S.imp.ctl.abort();S.imp.files.forEach(f=>URL.revokeObjectURL(f.url))}S.imp=null;render();break;
+    case 'impcancel':if(S.imp){if(S.imp.ctl)S.imp.ctl.abort();S.imp.files.forEach(f=>URL.revokeObjectURL(f.url))}S.imp=null;render();restoreScroll();break;
     case 'impsave':saveImport();break;
     case 'impladd':{const d=impDay(t);if(d){d.lectures.push({raw:'',course:'',koma:0});render()}break}
     case 'impldel':{const d=impDay(t);if(d){d.lectures.splice(Number(t.dataset.li),1);render()}break}
     case 'rcopy':{const txt=S.rankText||'',msg=document.getElementById('rcopyMsg'),box=document.getElementById('rcopyBox');
       const fallback=()=>{box.hidden=false;box.value=txt;box.focus();box.select();msg.textContent='下の文字を選んでコピーしてください'};
       try{navigator.clipboard.writeText(txt).then(()=>{msg.textContent='コピーしました。LINEやメモに貼り付けられます'},fallback)}catch(e){fallback()}break}
-    case 'rcancel':S.reorder=null;render();break;
+    case 'rcancel':S.reorder=null;render();restoreScroll();break;
   }
 });
 document.addEventListener('change',ev=>{
@@ -1116,7 +1127,7 @@ document.addEventListener('change',ev=>{
 document.addEventListener('input',ev=>{
   const t=ev.target;
   if(t.id==='impPaste'&&S.imp){S.imp.paste=t.value;return}
-  if(t.id==='q'){S.q=t.value.trim();const pos=t.selectionStart;render();const q=document.getElementById('q');if(q){q.focus();try{q.setSelectionRange(pos,pos)}catch(e){}}return}
+  if(t.id==='q'){if(ev.isComposing)return;S.q=t.value.trim();render();return}
   if(!S.editing)return;
   if(t.dataset.f&&t.dataset.f!=='archived')S.editing[t.dataset.f]=t.value;
   else if(t.dataset.c!=null)S.editing.courses[Number(t.dataset.c)][t.dataset.k]=t.value;
