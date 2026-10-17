@@ -257,6 +257,9 @@ table.imp select{border:1px solid var(--line);border-radius:6px;padding:3px 4px;
 .ptable th.today{color:var(--today-ink);box-shadow:inset 0 3px 0 var(--today-ink)}
 .istoday{color:var(--today-ink);font-weight:700;background:var(--today-bg);border-radius:4px;padding:0 4px}
 .col.today .b{background:var(--today-ink)}
+.pastebox{border:1px dashed var(--line);border-radius:var(--r);padding:8px 12px}
+.pastebox summary{cursor:pointer;font-size:13px;color:var(--ink-2)}
+.pastebox[open]{display:flex;flex-direction:column;gap:8px}
 .lrow{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-bottom:4px;border-radius:6px;padding:2px}
 .lrow .raw{font-size:11px;color:var(--muted)}
 .btn.xs{padding:2px 6px;font-size:12px}
@@ -618,7 +621,7 @@ async function prepImages(file){
   try{
     const img=new Image();img.src=url;await img.decode();
     const W=img.naturalWidth,H=img.naturalHeight;
-    const cut=(x,y,w,h)=>{const sc=Math.min(1,3000/Math.max(w,h));const c=document.createElement('canvas');c.width=Math.round(w*sc);c.height=Math.round(h*sc);
+    const cut=(x,y,w,h)=>{const sc=Math.min(1,1600/Math.max(w,h));const c=document.createElement('canvas');c.width=Math.round(w*sc);c.height=Math.round(h*sc);
       c.getContext('2d').drawImage(img,x,y,w,h,0,0,c.width,c.height);return new Promise(r=>c.toBlob(r,'image/jpeg',0.9))};
     const out=[await cut(0,0,W,H)];
     if((S.imgLimit?.maxCount||1)>=3){const ov=0.04;
@@ -627,10 +630,23 @@ async function prepImages(file){
     return out.filter(Boolean);
   }finally{URL.revokeObjectURL(url)}
 }
-function impErr(e){return ({not_granted:'Claudeの利用が許可されていません。もう一度読み取るときに出る確認で「許可」を選んでください。',sampling_disabled:'このアカウントではClaudeを使った読み取りができません。',
-  rate_limited:'Claudeの利用が混み合っているか、利用上限に達しています。少し時間をおいてから読み取ってください。',image_rejected:'この写真は読み込めませんでした。JPEGかPNGの写真を選び直してください。',
+function impErr(e){return ({not_granted:'ログインの確認ができませんでした。アプリを開き直してから、もう一度読み取ってください。',sampling_disabled:'写真の読み取りの設定（APIキー）がまだ終わっていません。管理者に伝えてください。',
+  rate_limited:'混み合っているか、今月の利用上限に達しています。少し時間をおいてから読み取ってください。続く場合は管理者に伝えてください。',image_rejected:'この写真は読み込めませんでした。JPEGかPNGの写真を選び直してください。',
   images_unavailable:'この画面では写真を送れません。claude.ai 上でこのページを開いてください。',invalid_json:'読み取りがうまくいきませんでした。もう一度「読み取る」を押してください。',
   refused:'この写真は読み取れませんでした。予定表の紙だけが写った写真を選んでください。',cancelled:''}[e&&e.code])??'読み取りに失敗しました。通信状況を確認して、もう一度「読み取る」を押してください。'}
+// 写真を追加（アルバム・ファイル・ドラッグ＆ドロップ・貼り付けの共通）
+function impAddFiles(list){
+  const I=S.imp;if(!I||I.step!=='pick')return;
+  const fs=[...(list||[])].filter(f=>f&&(/^image\//.test(f.type)||/\.(jpe?g|png|heic|heif|webp|gif)$/i.test(f.name||'')));
+  if(!fs.length){I.err='写真のファイルを選んでください（JPEG・PNG・HEIC など）。';render();return}
+  const room=Math.max(0,IMP_MAX-I.files.length);
+  fs.slice(0,room).forEach(f=>I.files.push({file:f,url:URL.createObjectURL(f)}));
+  I.err=fs.length>room?'写真は'+IMP_MAX+'枚までです。最初の'+room+'枚だけ追加しました。':'';render();
+}
+document.addEventListener('dragover',ev=>{if(S.imp&&S.imp.step==='pick'){ev.preventDefault();document.getElementById('impDrop')?.classList.add('over')}});
+document.addEventListener('dragleave',ev=>{if(ev.target.id==='impDrop')ev.target.classList.remove('over')});
+document.addEventListener('drop',ev=>{if(S.imp&&S.imp.step==='pick'){ev.preventDefault();impAddFiles(ev.dataTransfer&&ev.dataTransfer.files)}});
+document.addEventListener('paste',ev=>{if(S.imp&&S.imp.step==='pick'&&ev.clipboardData){const fs=[...ev.clipboardData.files];if(fs.length){ev.preventDefault();impAddFiles(fs)}}});
 // 1枚分を読み取る
 async function readSheet(I,sh){
   sh.status='reading';render();
@@ -648,7 +664,7 @@ async function readSheet(I,sh){
   render();
 }
 function setSheetStudent(sh,sid){sh.sid=sid||'';const st=S.students[sh.sid];sh.data=st&&sh.raw?normImport(sh.raw,st):(sh.raw?{name:sh.name,days:[]}:null)}
-async function runImport(){
+async function runPaste(){
   const I=S.imp;if(!I)return;let obj;
   try{obj=JSON.parse(String(I.paste||'').trim())}catch(e){I.err='貼り付けた文字を読み込めませんでした。Claude版でコピーした文字を、そのまま全部貼り付けてください。';render();return}
   const list=Array.isArray(obj)?obj:(obj&&Array.isArray(obj.sheets)?obj.sheets:[]);
@@ -661,6 +677,18 @@ async function runImport(){
     if(sh.data&&!sh.data.days.length){sh.status='error';sh.err='日付が読み取れていません。'}
     return sh});
   I.step='review';I.err='';render();
+}
+async function runImport(){
+  const I=S.imp;if(!I||!I.files.length||!S.sample)return;
+  if(I.sid&&I.files.length>1){I.err='生徒を1人に決めたときは、写真は1枚だけ選んでください。複数枚のときは「写真の氏名から自動で決める」を選んでください。';render();return}
+  I.step='reading';I.err='';I.ctl=new AbortController();
+  I.sheets=I.files.map(f=>({file:f.file,url:f.url,status:'wait',err:'',sid:'',raw:null,data:null,name:'',skip:false,auto:false}));render();
+  // 2枚ずつ同時に読む
+  let next=0;const worker=async()=>{while(next<I.sheets.length&&S.imp===I&&!I.ctl.signal.aborted){const sh=I.sheets[next++];await readSheet(I,sh)}};
+  await Promise.all([worker(),worker()]);
+  if(S.imp!==I)return;
+  I.sheets.forEach(sh=>{if(sh.status==='wait'){sh.status='error';sh.err='中止しました。'}});
+  I.step='review';render();
 }
 function impStatus(sh){return {wait:'<span class="badge warn">待ち</span>',reading:'<span class="badge warn"><span class="spin sm" aria-hidden="true"></span>読み取り中</span>',done:'<span class="badge">読み取り済み</span>',error:'<span class="badge bad">読み取れず</span>'}[sh.status]}
 function vSheet(I,sh,si){
@@ -692,27 +720,25 @@ function vSheet(I,sh,si){
 }
 function vImport(){
   const I=S.imp,studs=allStudents().filter(x=>!x.archived);
-  let h='<div class="editor"><h3>読み取り結果を貼り付け</h3>';
+  let h='<div class="editor"><h3>写真から読み込む</h3>';
   if(I.step==='pick'){
-    h+='<p class="lead" style="margin:0">写真の読み取りは Claude版 で行います。Claude版の「写真から読み込む」で読み取ったあと、「新しいアプリ用にコピー」を押してコピーした文字を、下に貼り付けてください。紙の氏名から生徒を自動で決め、保存する前に確認・修正できます。</p>'+
-    '<textarea id="impPaste" class="copybox" rows="6" placeholder="ここに貼り付け" aria-label="読み取り結果">'+esc(I.paste||'')+'</textarea>'+
-    (I.err?'<div class="err-msg">'+esc(I.err)+'</div>':'')+
-    '<div class="toolbar" style="margin:0"><button class="btn primary" data-act="impread">読み込む</button><button class="btn" data-act="impcancel">やめる</button></div>';
-    return h+'</div>';
-  }
-  if(false){
     h+='<p class="lead" style="margin:0">予定表の紙の写真を読み取って、週の予定に入れます。写真は最大'+IMP_MAX+'枚まで一度に選べます。紙の氏名から生徒を自動で決めるので、何人分でもまとめて登録できます。読み取った内容は、保存する前に確認・修正できます。</p>'+
     '<div class="fgrid"><label class="field"><span>生徒</span><select id="impSid"><option value=""'+(I.sid?'':' selected')+'>写真の氏名から自動で決める（複数枚OK）</option>'+studs.map(x=>'<option value="'+x.id+'"'+(x.id===I.sid?' selected':'')+'>'+esc(x.name)+'（'+esc(x.grade)+'）だけ</option>').join('')+'</select></label>'+
-    '<label class="field"><span>予定表の写真（最大'+IMP_MAX+'枚）</span><input type="file" id="impFile" accept="image/*" multiple></label></div>'+
+    '</div><div class="field"><span>予定表の写真（最大'+IMP_MAX+'枚）</span>'+
+    '<div class="pickrow"><label class="btn pickbtn">写真アルバムから選ぶ<input type="file" class="vh" data-impfile="1" accept="image/*" multiple></label>'+
+    '<label class="btn pickbtn">ファイルから選ぶ<input type="file" class="vh" data-impfile="1" accept=".jpg,.jpeg,.png,.heic,.heif,.webp,.gif,image/jpeg,image/png,image/heic,image/heif,image/webp" multiple></label></div>'+
+    '<div class="dropzone" id="impDrop">ここに写真をドラッグ＆ドロップ、またはコピーした写真を貼り付け（⌘V / Ctrl+V）もできます</div></div>'+
     (I.files.length?'<div class="impprev">'+I.files.map((f,i)=>'<figure class="thumbf"><img class="impthumb sm" src="'+f.url+'" alt="写真'+(i+1)+'"><figcaption class="rnote" style="margin:0">写真'+(i+1)+' <button class="btn ghost xs" data-act="impfdel" data-i="'+i+'" aria-label="写真'+(i+1)+'を外す">×</button></figcaption></figure>').join('')+'</div>':'')+
     '<p class="rnote" style="margin:0">紙全体が写るように、明るい場所で撮った写真を選んでください。1枚に生徒1人分です。1枚あたり30秒〜1分ほどかかります（2枚ずつ同時に読みます）。</p>'+
+    (S.canImg?'':'<div class="banner" style="margin:0">写真の読み取りの準備（管理者の設定）がまだ終わっていません。下の「Claude版で読み取った結果を貼り付ける」は使えます。</div>')+
+    '<details class="pastebox"'+(I.paste?' open':'')+'><summary>Claude版で読み取った結果を貼り付ける</summary><textarea id="impPaste" class="copybox" rows="5" placeholder="Claude版の「新しいアプリ用にコピー」でコピーした文字" aria-label="読み取り結果">'+esc(I.paste||'')+'</textarea><button class="btn" data-act="imppaste">貼り付けた結果を読み込む</button></details>'+
     (I.err?'<div class="err-msg">'+esc(I.err)+'</div>':'')+
-    '<div class="toolbar" style="margin:0"><button class="btn primary" data-act="impread"'+(I.files.length?'':' disabled')+'>'+(I.files.length>1?I.files.length+'枚を読み取る':'読み取る')+'</button><button class="btn" data-act="impcancel">やめる</button></div>';
+    '<div class="toolbar" style="margin:0"><button class="btn primary" data-act="impread"'+(I.files.length&&S.canImg?'':' disabled')+'>'+(I.files.length>1?I.files.length+'枚を読み取る':'読み取る')+'</button><button class="btn" data-act="impcancel">やめる</button></div>';
     return h+'</div>';
   }
   const done=I.sheets.filter(x=>x.status==='done'||x.status==='error').length;
   if(I.step==='reading'){
-    h+='<div class="impbusy"><span class="spin" aria-hidden="true"></span><div><b>写真を読み取っています…（'+done+' / '+I.sheets.length+'枚）</b><p class="rnote" style="margin:0">1枚あたり30秒〜1分ほどかかります。初めて使うときは、Claudeの利用を許可する確認が出ます。</p></div></div>'+
+    h+='<div class="impbusy"><span class="spin" aria-hidden="true"></span><div><b>写真を読み取っています…（'+done+' / '+I.sheets.length+'枚）</b><p class="rnote" style="margin:0">1枚あたり30秒〜1分ほどかかります。</p></div></div>'+
     '<div class="sheets">'+I.sheets.map((sh,i)=>'<div class="shead"><img class="impthumb sm" src="'+sh.url+'" alt="写真'+(i+1)+'"><div class="srowh"><b>写真'+(i+1)+'</b>'+impStatus(sh)+(sh.name?'<span class="rnote" style="margin:0">'+esc(sh.name)+'</span>':'')+'</div></div>').join('')+'</div>'+
     '<div class="toolbar" style="margin:0"><button class="btn" data-act="impstop">中止する</button></div>';
     return h+'</div>';
@@ -724,7 +750,7 @@ function vImport(){
     (noSid?'<div class="banner" style="margin:0">生徒が決まっていない写真が'+noSid+'枚あります。「登録する生徒」を選ぶか、「この写真は取り込まない」にチェックしてください。</div>':'')+
     '<div class="sheets">'+I.sheets.map((sh,i)=>vSheet(I,sh,i)).join('')+'</div>'+
     (I.err?'<div class="err-msg">'+esc(I.err)+'</div>':'')+
-    '<div class="toolbar" style="margin:0"><button class="btn primary" data-act="impsave"'+(ok.length&&W()?'':' disabled')+'>この内容で保存（'+ok.length+'人・'+nDays+'日分を上書き）</button><button class="btn" data-act="impback">貼り付け直す</button><button class="btn" data-act="impcancel">やめる</button></div>';
+    '<div class="toolbar" style="margin:0"><button class="btn primary" data-act="impsave"'+(ok.length&&W()?'':' disabled')+'>この内容で保存（'+ok.length+'人・'+nDays+'日分を上書き）</button><button class="btn" data-act="impback">写真を選び直す</button><button class="btn" data-act="impcancel">やめる</button></div>';
   return h+'</div>';
 }
 function impEdit(t){
@@ -789,7 +815,7 @@ function vPlan(){
   '<div class="toolbar"><button class="btn" data-act="pweek" data-d="-7" aria-label="前の週">◀</button><input class="date" type="date" id="pDate" value="'+ws+'"><button class="btn" data-act="pweek" data-d="7" aria-label="次の週">▶</button>'+
   '<span class="range">'+fmtDay(ws)+' 〜 '+fmtDay(we)+'</span>'+
   '<label class="inline" style="font-size:12px;color:var(--muted)">週の始まり <select class="date" id="wsDow"'+(W()?'':' disabled')+'>'+DOW.map((d,i)=>'<option value="'+i+'"'+(Number(S.settings.weekStartDow)===i?' selected':'')+'>'+d+'曜</option>').join('')+'</select></label>'+
-  '<span class="sep"></span><button class="btn" data-act="copyplan"'+(hasPrev&&W()&&list.length?'':' disabled')+'>前の週の予定をコピー</button><button class="btn primary" data-act="impopen"'+(W()&&list.length?'':' disabled')+'>読み取り結果を貼り付け</button></div>'+(S.impMsg?'<div class="banner ok">'+esc(S.impMsg)+'</div>':'')+
+  '<span class="sep"></span><button class="btn" data-act="copyplan"'+(hasPrev&&W()&&list.length?'':' disabled')+'>前の週の予定をコピー</button><button class="btn primary" data-act="impopen"'+(W()&&list.length?'':' disabled')+'>写真から読み込む</button></div>'+(S.impMsg?'<div class="banner ok">'+esc(S.impMsg)+'</div>':'')+
   '<div class="toolbar"><div class="totals"><span>受講予定 <b>'+tl+'</b> コマ</span><span>演習予定 <b>'+te+'</b> ステージ</span><span>登校予定 <b>'+ta+'</b> 回</span></div></div>';
   if(!list.length)return h+emptyStudents();
   const dis=W()?'':' disabled';
@@ -1087,6 +1113,7 @@ document.addEventListener('click',ev=>{
     case 'impopen':{rememberScroll();S.impMsg='';S.imp={step:'pick',sid:'',files:[],sheets:[],err:'',paste:''};render();window.scrollTo({top:0});break}
     case 'impfdel':{const I=S.imp;if(I){const [f]=I.files.splice(Number(t.dataset.i),1);if(f)URL.revokeObjectURL(f.url);render()}break}
     case 'impread':runImport();break;
+    case 'imppaste':runPaste();break;
     case 'impstop':if(S.imp&&S.imp.ctl)S.imp.ctl.abort();break;
     case 'impback':if(S.imp){if(S.imp.ctl)S.imp.ctl.abort();S.imp.step='pick';S.imp.sheets=[];S.imp.err='';render()}break;
     case 'impcancel':if(S.imp){if(S.imp.ctl)S.imp.ctl.abort();S.imp.files.forEach(f=>URL.revokeObjectURL(f.url))}S.imp=null;render();restoreScroll();break;
@@ -1102,9 +1129,7 @@ document.addEventListener('click',ev=>{
 document.addEventListener('change',ev=>{
   const t=ev.target;
   if(t.dataset.imp){impEdit(t);return}
-  if(t.id==='impFile'&&S.imp){const I=S.imp,fs=[...(t.files||[])];const room=IMP_MAX-I.files.length;
-    fs.slice(0,Math.max(0,room)).forEach(f=>I.files.push({file:f,url:URL.createObjectURL(f)}));
-    I.err=fs.length>room?'写真は'+IMP_MAX+'枚までです。最初の'+Math.max(0,room)+'枚だけ追加しました。':'';render();return}
+  if(t.dataset.impfile&&S.imp){impAddFiles(t.files);t.value='';return}
   if(t.id==='impSid'&&S.imp){S.imp.sid=t.value;render();return}
   if(t.id==='dDate'&&t.value){S.date=t.value;render()}
   else if(t.id==='pDate'&&t.value){S.planStart=t.value;render()}
@@ -1170,11 +1195,30 @@ function fsAdapter(fs){
   return {doc:p=>wrapDoc(fs.doc(p)),
     collection:p=>({onSnapshot:(n,e)=>fs.collection(p).onSnapshot(q=>n({docs:q.docs.map(snapDoc),size:q.size,empty:q.empty}),e)})};
 }
+// 写真の読み取り：Apps Script の中継（READ_URL）経由で Claude API に送る
+const blobToB64=b=>new Promise((ok,ng)=>{const r=new FileReader();r.onload=()=>ok(String(r.result).split(',')[1]);r.onerror=ng;r.readAsDataURL(b)});
+function parseJsonLoose(t){t=String(t||'').trim();try{return JSON.parse(t)}catch(e){}
+  const m=t.match(/```(?:json)?\s*([\s\S]*?)```/);if(m){try{return JSON.parse(m[1])}catch(e){}}
+  const a=t.indexOf('{'),b=t.lastIndexOf('}');if(a>=0&&b>a){try{return JSON.parse(t.slice(a,b+1))}catch(e){}}
+  throw {code:'invalid_json'}}
+function makeReader(url){return {json:async(prompt,opt)=>{
+  const u=firebase.auth().currentUser;if(!u)throw {code:'not_granted'};
+  const idToken=await u.getIdToken();
+  const images=await Promise.all([...(opt.images||[])].map(blobToB64));
+  let r;
+  try{r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({idToken,prompt,images}),signal:opt.signal})}
+  catch(e){throw {code:e&&e.name==='AbortError'?'cancelled':'upstream_error'}}
+  let j;try{j=await r.json()}catch(e){throw {code:'upstream_error'}}
+  if(j.error)throw {code:({auth:'not_granted',rate_limited:'rate_limited',refused:'refused',no_key:'sampling_disabled'})[j.error]||'upstream_error'};
+  if(j.stop_reason==='max_tokens')throw {code:'invalid_json'};
+  return parseJsonLoose(j.text);
+}}}
 let started=false;
 function startData(fs){
   if(started)return;started=true;
   const db=fsAdapter(fs);
   S.db=db;S.dbChecked=true;S.canWrite=true;setSave('idle');
+  if(window.READ_URL){S.sample=makeReader(window.READ_URL);S.imgLimit={maxCount:3};S.canImg=true}
   const onErr=e=>{setSave('error','読み込みに失敗しました（開き直してください）')};
   db.collection('students').onSnapshot(snap=>{const o={};snap.docs.forEach(d=>{o[d.id]={id:d.id,...clone(d.data())}});S.students=o;S.loaded.students=true;render()},onErr);
   db.collection('days').onSnapshot(snap=>{const o={};snap.docs.forEach(d=>{o[d.id]=d.data()});S.days=o;overlay('days');S.loaded.days=true;render()},onErr);
