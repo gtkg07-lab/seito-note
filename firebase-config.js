@@ -7,3 +7,5 @@ window.FIREBASE_CONFIG={
   messagingSenderId:"785237485573",
   appId:"1:785237485573:web:fd3b253ccbc6978badd46c"
 };
+// 写真の読み取りの中継（Cloudflare Workers）。APIキーは中継役の中にだけある
+window.READ_URL='https://seito-note-read.gtkg07.workers.dev/';
