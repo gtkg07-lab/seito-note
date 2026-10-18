@@ -486,7 +486,10 @@ function render(){
   renderBanner();renderFilters();
   const fn={daily:vDaily,plan:vPlan,week:vWeek,month:vMonth,rank:vRank,students:vStudents}[S.tab]||vDaily;
   const y=window.scrollY;
+  // 横にスクロールする表（週の予定・読み取りの確認など）の位置も覚えておき、作り直した後に戻す
+  const sx=[...v.querySelectorAll('.tablewrap')].map(e=>e.scrollLeft);
   v.innerHTML=fn();
+  v.querySelectorAll('.tablewrap').forEach((e,i)=>{if(sx[i])e.scrollLeft=sx[i]});
   if(Math.abs(window.scrollY-y)>1)window.scrollTo(0,y);
 }
 // 編集・並べ替え・貼り付けを開く前の位置を覚えておき、閉じたら同じ位置に戻す
