@@ -231,6 +231,7 @@ tfoot td{font-weight:700;background:var(--sunk);border-top:1px solid var(--line)
 .copybox{width:100%;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px;font-size:12px;margin-bottom:8px}
 @media (max-width:760px){.band{grid-template-columns:1fr}.names{grid-column:1}}
 .banner.ok{background:var(--good-soft);color:var(--good)}
+.pk .mute,.pk.mute{color:var(--muted)}
 .pk{font-size:10px;color:var(--accent);margin-top:2px;white-space:nowrap}
 .impprev{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
 .impthumb{max-width:220px;max-height:220px;border-radius:8px;border:1px solid var(--line);object-fit:contain;background:var(--sunk)}
@@ -587,9 +588,9 @@ function impPrompt(s){
   '年は'+year+'年とする。月が省略された日付は前後の日付から補う。日付が書かれていない列は出力しない。\n'+
   (s?'この生徒が登録している講座：'+JSON.stringify(courseInfo(s))+'\nこの生徒が受講している高マスの単元：'+JSON.stringify(sUnits(s).map(u=>({id:u.id,name:u.name})))+'（空なら高マスは出力しない）\n'
     :'生徒名簿（sid・氏名・学年・講座・受講している高マスの単元id）：'+JSON.stringify(roster)+'\n氏名欄の手書きの名前から、名簿の生徒を1人選んで sid に入れる。名字だけ・崩し字・似た字でも、名簿の中で最も当てはまる生徒を選ぶ。決められなければ sid は null。受講と高マスは、その生徒の講座・単元から選ぶ。高マスの単元id：tango=単語、jukugo=熟語、bunpo=文法。\n')+
-  '受講は、講座一覧から最も当てはまるものの id を course に入れる。略記、全角と半角、「Ⅱ」「II」「2」の違い、「組」「講」の有無は同じものとみなす。「英18」「数10」のように科目名（英・英語・数・数学）だけで書かれた場合は、その科目（subject）の講座のうち finished が false のものを選ぶ（例：英語の講座がC組とD組で、D組が finished なら「英18」はC組の第18講）。どれか決められなければ course は null。koma は講の番号（数字）。\n\n'+
+  '受講は、講座一覧から最も当てはまるものの id を course に入れる。略記、全角と半角、「Ⅱ」「II」「2」の違い、「組」「講」の有無は同じものとみなす。「英18」「数10」のように科目名（英・英語・数・数学）だけで書かれた場合は、その科目（subject）の講座のうち finished が false のものを選ぶ（例：英語の講座がC組とD組で、D組が finished なら「英18」はC組の第18講）。どれか決められなければ course は null。koma は講の番号（数字）。講座名だけで番号が書かれていなければ koma は null（受講することだけ分かればよい）。\n\n'+
   'JSONだけで答える。形：\n{"name":"氏名欄の文字",'+(s?'':'"sid":"名簿のsid",')+'"days":[{"date":"'+year+'-10-16","dow":"金","attend":false,"time":"","lectures":[{"raw":"C14","course":"講座のid","koma":14}],"hm":[{"raw":"単語3","unit":"tango","stages":3}],"unsure":[]}]}\n'+
-  'attend：「有」に丸→true、「無」に丸→false、どちらにも丸がない→null。time は "HH:MM"（24時間表記、書かれていなければ ""）。raw は紙に書かれた文字そのまま。読みにくい・自信がない項目は unsure に "date" "attend" "time" "lectures" "hm" のうち当てはまるものを入れる。';
+  'attend：「有」に丸→true、「無」に丸→false、どちらにも丸がない→null。time は "HH:MM"（24時間表記、書かれていなければ "" ／ 時間が書かれていないのは普通なので unsure にしない）。raw は紙に書かれた文字そのまま。読みにくい・自信がない項目は unsure に "date" "attend" "time" "lectures" "hm" のうち当てはまるものを入れる。';
 }
 // 読み取った氏名から生徒を決める（1人に決まらなければ ''）
 function matchStudent(name){const n=normName(name);if(!n)return '';const ss=allStudents().filter(x=>!x.archived);
@@ -603,11 +604,11 @@ function normImport(raw,s){
     const unsure=Array.isArray(d.unsure)?d.unsure.map(String):[];
     const dw=String(d.dow||'').replace(/[()（）曜日\s]/g,'').slice(0,1);if(dw&&DOW[dow(date)]!==dw)unsure.push('date');
     let attend=d.attend;if(attend!==true&&attend!==false){attend=false;unsure.push('attend')}
-    const tm=String(d.time||'').trim().match(/^(\d{1,2})[:：](\d{2})$/);const time=tm?pad(tm[1])+':'+tm[2]:'';if(attend&&!time)unsure.push('time');
+    const tm=String(d.time||'').trim().match(/^(\d{1,2})[:：](\d{2})$/);const time=tm?pad(tm[1])+':'+tm[2]:'';
     const lectures=(Array.isArray(d.lectures)?d.lectures:[]).map(l=>{const rawTxt=String(l&&l.raw||'');
       const course=(s.courses||[]).some(c=>c.id===l.course)?l.course:matchCourse(s,rawTxt);
       const koma=Math.max(0,Math.round(Number(l.koma)||splitRaw(rawTxt).koma||0));
-      if(!course||!koma)unsure.push('lectures');return {raw:rawTxt,course:course||'',koma}});
+      if(!course)unsure.push('lectures');return {raw:rawTxt,course:course||'',koma}});
     const hm={};for(const h of (Array.isArray(d.hm)?d.hm:[])){const u=units.find(x=>x.id===h.unit)||units.find(x=>String(h.raw||'').includes(x.name));
       if(u)hm[u.id]=(hm[u.id]||0)+Math.max(0,Math.round(Number(h.stages)||0));else unsure.push('hm')}
     days.push({date,attend,time,lectures,hm,unsure:[...new Set(unsure)],skip:false});
@@ -705,8 +706,8 @@ function vSheet(I,sh,si){
   const D=sh.data,units=sUnits(s);
   h+='<div class="tablewrap" style="margin:0"><table class="imp"><thead><tr><th>取り込む</th><th class="l">日付</th><th class="l">登校</th><th class="l">時間</th><th class="l">受講</th>'+(units.length?'<th class="l">高マス</th>':'')+'</tr></thead><tbody>'+
   D.days.map((d,i)=>{const u=k=>d.unsure.includes(k)?' uns':'';const off=d.skip?' disabled':'';const at=' data-si="'+si+'" data-di="'+i+'"';
-    const lec=d.lectures.map((l,j)=>{const bad=!l.course||!l.koma;return '<div class="lrow'+(bad?' uns':'')+'"><select data-imp="lcourse"'+at+' data-li="'+j+'" aria-label="講座"'+off+'><option value="">講座を選ぶ</option>'+(s.courses||[]).map(c=>'<option value="'+c.id+'"'+(c.id===l.course?' selected':'')+'>'+esc(c.name)+'</option>').join('')+'</select>'+
-      '<span class="rnote" style="margin:0">第</span><input type="number" min="1" max="99" inputmode="numeric" data-imp="lkoma"'+at+' data-li="'+j+'" value="'+(l.koma||'')+'" aria-label="講の番号"'+off+'><span class="rnote" style="margin:0">講</span>'+
+    const lec=d.lectures.map((l,j)=>{const bad=!l.course;return '<div class="lrow'+(bad?' uns':'')+'"><select data-imp="lcourse"'+at+' data-li="'+j+'" aria-label="講座"'+off+'><option value="">講座を選ぶ</option>'+(s.courses||[]).map(c=>'<option value="'+c.id+'"'+(c.id===l.course?' selected':'')+'>'+esc(c.name)+'</option>').join('')+'</select>'+
+      '<span class="rnote" style="margin:0">第</span><input type="number" min="1" max="99" inputmode="numeric" data-imp="lkoma"'+at+' data-li="'+j+'" value="'+(l.koma||'')+'" placeholder="未定" aria-label="講の番号（分からなければ空のまま）"'+off+'><span class="rnote" style="margin:0">講</span>'+
       (l.raw?'<span class="raw">紙：'+esc(l.raw)+'</span>':'')+'<button class="btn ghost xs" data-act="impldel"'+at+' data-li="'+j+'" aria-label="この受講を消す"'+off+'>×</button></div>'}).join('')+
       '<button class="btn ghost xs" data-act="impladd"'+at+off+'>＋ 受講</button>';
     const hm=units.map(un=>'<label class="inline hmi">'+un.name+'<input type="number" min="0" max="99" inputmode="numeric" data-imp="hm"'+at+' data-u="'+un.id+'" value="'+(d.hm[un.id]||'')+'" placeholder="0" aria-label="'+un.name+'のステージ数"'+off+'></label>').join('');
@@ -778,7 +779,7 @@ async function saveSheet(sh){
     // 上書き：前に入っていた講座・単元は 0 にしてから、紙の内容を入れる
     const r={attend:!!d.attend,time:d.attend?(d.time||''):'',courses:{},komas:{},hm:{}};
     for(const k in old.courses||{})r.courses[k]=0;for(const k in old.komas||{})r.komas[k]=[];for(const k in old.hm||{})r.hm[k]=0;
-    for(const l of d.lectures){r.courses[l.course]=(r.courses[l.course]||0)+1;(r.komas[l.course]=r.komas[l.course]||[]).push(l.koma)}
+    for(const l of d.lectures){r.courses[l.course]=(r.courses[l.course]||0)+1;if(l.koma)(r.komas[l.course]=r.komas[l.course]||[]).push(l.koma)}
     for(const k in d.hm)r.hm[k]=d.hm[k]||0;
     const cur=clone(S.pdays[d.date]||{date:d.date,rows:{}});cur.rows=cur.rows||{};cur.rows[s.id]=r;S.pdays[d.date]=cur;
     if(!await writeDoc('pdays/'+d.date,{date:d.date,rows:{[s.id]:r}},true))return d.date;
@@ -791,7 +792,7 @@ async function saveImport(){
   for(const sh of list){
     const st=S.students[sh.sid],use=sh.data.days.filter(d=>!d.skip),dates=use.map(d=>d.date);
     if(new Set(dates).size!==dates.length){I.err=st.name+'さんの写真に、同じ日付が2回あります。日付を確認してください。';render();return}
-    if(use.some(d=>d.lectures.some(l=>!l.course||!l.koma))){I.err=st.name+'さんの写真に、講座か講の番号が決まっていない受講があります（黄色の欄）。選び直すか「×」で消してください。';render();return}
+    if(use.some(d=>d.lectures.some(l=>!l.course))){I.err=st.name+'さんの写真に、講座が決まっていない受講があります（黄色の欄）。講座を選ぶか「×」で消してください。';render();return}
   }
   I.err='';I.saving=true;
   const saved=[];let first=null;
@@ -824,9 +825,9 @@ function vPlan(){
     const t=planTot(s.id,ws,we);
     const head='<tr><th class="l">項目</th>'+days.map(d=>'<th'+TD(d)+'>'+fmtDay(d)+(d===today()?'<br>今日':'')+'</th>').join('')+'<th>合計</th></tr>';
     const attRow='<tr><td class="l">登校</td>'+days.map((d,i)=>'<td'+TD(d)+'><button class="pa" data-act="patt" data-sid="'+s.id+'" data-date="'+d+'" aria-pressed="'+!!ps[i].attend+'" aria-label="'+fmtDay(d)+' 登校"'+dis+'>'+(ps[i].attend?'✓':'－')+'</button></td>').join('')+'<td class="num">'+t.att+'回</td></tr>';
-    const timeRow='<tr><td class="l">登校時刻</td>'+days.map((d,i)=>'<td'+TD(d)+'>'+(ps[i].attend?'<input type="time" class="tm" id="tm-'+s.id+'-'+d+'" data-act="ptime" data-sid="'+s.id+'" data-date="'+d+'" value="'+esc(ps[i].time||'')+'" step="300" aria-label="'+fmtDay(d)+'の登校時刻"'+dis+'>':'')+'</td>').join('')+'<td></td></tr>';
+    const timeRow='<tr><td class="l">登校時刻</td>'+days.map((d,i)=>'<td'+TD(d)+'>'+(ps[i].attend?'<input type="time" class="tm" id="tm-'+s.id+'-'+d+'" data-act="ptime" data-sid="'+s.id+'" data-date="'+d+'" value="'+esc(ps[i].time||'')+'" step="300" aria-label="'+fmtDay(d)+'の登校時刻"'+dis+'>'+(ps[i].time?'':'<div class="pk mute">時間未定</div>'):'')+'</td>').join('')+'<td></td></tr>';
     const numRow=(kind,id,label,note)=>{let tot=0;const cells=days.map((d,i)=>{const v=Number((kind==='c'?ps[i].courses:ps[i].hm)?.[id])||0;tot+=v;
-      return '<td'+TD(d)+'><input type="number" class="pn" min="0" max="99" inputmode="numeric" id="pn-'+kind+'-'+s.id+'-'+id+'-'+d+'" data-act="pnum" data-kind="'+kind+'" data-id="'+id+'" data-sid="'+s.id+'" data-date="'+d+'" value="'+(v||'')+'" placeholder="0" aria-label="'+esc(fmtDay(d)+' '+label)+'"'+dis+'>'+(kind==='c'&&(ps[i].komas?.[id]||[]).length?'<div class="pk">'+ps[i].komas[id].map(n=>'第'+n+'講').join(' ')+'</div>':'')+'</td>'}).join('');
+      return '<td'+TD(d)+'><input type="number" class="pn" min="0" max="99" inputmode="numeric" id="pn-'+kind+'-'+s.id+'-'+id+'-'+d+'" data-act="pnum" data-kind="'+kind+'" data-id="'+id+'" data-sid="'+s.id+'" data-date="'+d+'" value="'+(v||'')+'" placeholder="0" aria-label="'+esc(fmtDay(d)+' '+label)+'"'+dis+'>'+(kind==='c'&&v?(()=>{const ks=ps[i].komas?.[id]||[],un=v-ks.length;return '<div class="pk">'+ks.map(n=>'第'+n+'講').join(' ')+(un>0?'<span class="mute">'+(ks.length?' ＋':'')+'講未定'+(un>1?'×'+un:'')+'</span>':'')+'</div>'})():'')+'</td>'}).join('');
       return '<tr><td class="l">'+esc(label)+' <span class="of">'+note+'</span></td>'+cells+'<td class="num">'+tot+'</td></tr>'};
     const cRows=(s.courses||[]).map(c=>numRow('c',c.id,'受講：'+c.name,'残'+Math.max(0,(Number(c.koma)||0)-courseDone(s,c)))).join('');
     const hRows=sUnits(s).map(u=>numRow('h',u.id,'高マス：'+u.name,'残'+Math.max(0,u.stages-hmCleared(s,u)))).join('');
