@@ -232,6 +232,20 @@ tfoot td{font-weight:700;background:var(--sunk);border-top:1px solid var(--line)
 @media (max-width:760px){.band{grid-template-columns:1fr}.names{grid-column:1}}
 .banner.ok{background:var(--good-soft);color:var(--good)}
 .pk .mute,.pk.mute{color:var(--muted)}
+.today-panel{margin:4px 0 14px;border-color:var(--today-ink);box-shadow:inset 4px 0 0 var(--today-ink)}
+.tphead{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap}
+.tphead h3{margin:0;font-size:16px}
+.tphead .totals{margin-left:auto}
+.tpnav{display:flex;gap:4px}
+.tph{font-size:12px;color:var(--muted);letter-spacing:.06em;margin:12px 0 6px}
+table.ttable td{vertical-align:top;white-space:normal}
+table.ttable tr.tgrp td{border-top:2px solid var(--line)}
+table.ttable tbody tr:first-child td{border-top:0}
+td.ttime{font-family:var(--f-num);font-weight:700;font-size:15px;color:var(--today-ink);white-space:nowrap;width:5.5em}
+.tchip{display:inline-block;background:var(--accent-soft);color:var(--ink);border-radius:6px;padding:1px 8px;margin:1px 4px 1px 0;font-size:12px;white-space:nowrap}
+.tchip b{color:var(--accent)}
+.tchip.hm{background:var(--good-soft)}
+.tchip.hm b{color:var(--good)}
 .pk{font-size:10px;color:var(--accent);margin-top:2px;white-space:nowrap}
 .impprev{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
 .impthumb{max-width:220px;max-height:220px;border-radius:8px;border:1px solid var(--line);object-fit:contain;background:var(--sunk)}
@@ -810,6 +824,31 @@ async function saveImport(){
   render();
 }
 
+// --- 本日の予定（週の予定の中） ---
+// その日の予定から、受講（講の番号つき）と高マスの中身を短い文にする
+function planLec(s,p){const out=[];for(const c of s.courses||[]){const n=Number(p.courses?.[c.id])||0;if(!n)continue;
+  const ks=(p.komas?.[c.id]||[]).filter(Boolean),un=n-ks.length;
+  out.push('<span class="tchip">'+esc(c.name)+' <b>'+[...ks.map(k=>'第'+k+'講'),...(un>0?[un>1?'講未定×'+un:'講未定']:[])].join('・')+'</b></span>')}return out}
+function planHm(s,p){return UNITS.filter(u=>Number(p.hm?.[u.id])>0).map(u=>'<span class="tchip hm">'+u.name+' <b>'+p.hm[u.id]+'</b>ステージ</span>')}
+function vToday(list){
+  const D=S.todayDate||today(),isT=D===today();
+  const go=[],home=[];
+  for(const s of list){const p=prow(D,s.id);if(!p)continue;const lec=planLec(s,p),hm=planHm(s,p);
+    if(p.attend)go.push({s,t:p.time||'',lec,hm});else if(lec.length||hm.length)home.push({s,lec,hm})}
+  // 時間の早い順。時間未定は最後
+  go.sort((a,b)=>((a.t?0:1)-(b.t?0:1))||a.t.localeCompare(b.t));
+  const none='<span class="none">—</span>';
+  let prev=null;
+  const goRows=go.map(r=>{const first=r.t!==prev;prev=r.t;
+    return '<tr class="'+(first?'tgrp':'')+'"><td class="l ttime">'+(first?(r.t||'<span class="none">時間未定</span>'):'')+'</td><td class="l">'+sname(r.s)+' <span class="of">'+esc(r.s.grade)+'</span></td><td class="l">'+(r.lec.join('')||none)+'</td><td class="l">'+(r.hm.join('')||none)+'</td></tr>'}).join('');
+  const homeRows=home.map(r=>'<tr><td class="l">'+sname(r.s)+' <span class="of">'+esc(r.s.grade)+'</span></td><td class="l">'+(r.lec.join('')||none)+'</td><td class="l">'+(r.hm.join('')||none)+'</td></tr>').join('');
+  return '<section class="panel today-panel"><div class="tphead"><h3>'+(isT?'本日の予定':fmtDay(D)+'の予定')+' <span class="range">'+fmtDay(D)+'</span></h3>'+
+    '<div class="tpnav"><button class="btn xs" data-act="tday" data-d="-1" aria-label="前の日">◀</button>'+(isT?'':'<button class="btn xs" data-act="tdaynow">今日</button>')+'<button class="btn xs" data-act="tday" data-d="1" aria-label="次の日">▶</button></div>'+
+    '<div class="totals"><span>登校予定 <b>'+go.length+'</b> 名</span><span>自宅受講 <b>'+home.length+'</b> 名</span></div></div>'+
+    '<h4 class="tph">登校予定</h4>'+(go.length?'<div class="tablewrap" style="margin-top:0"><table class="ttable"><thead><tr><th class="l">時間</th><th class="l">生徒</th><th class="l">受講</th><th class="l">高マス</th></tr></thead><tbody>'+goRows+'</tbody></table></div>':'<p class="none">この日の登校予定はありません。</p>')+
+    '<h4 class="tph">自宅受講</h4>'+(home.length?'<div class="tablewrap" style="margin-top:0"><table class="ttable"><thead><tr><th class="l">生徒</th><th class="l">受講</th><th class="l">高マス</th></tr></thead><tbody>'+homeRows+'</tbody></table></div>':'<p class="none">この日の自宅受講の予定はありません。</p>')+
+    '<p class="note" style="margin:6px 0 0">「自宅受講」は、登校しない日に受講か高マスの予定が入っている生徒です。</p></section>';
+}
 function vPlan(){
   if(S.imp)return '<h2>週の予定</h2>'+vImport();
   const ws=S.planStart||(S.planStart=weekStartFor(today())),we=addDays(ws,6),list=visible(),days=rangeDays(ws,we);
@@ -822,6 +861,7 @@ function vPlan(){
   '<span class="sep"></span><button class="btn" data-act="copyplan"'+(hasPrev&&W()&&list.length?'':' disabled')+'>前の週の予定をコピー</button><button class="btn primary" data-act="impopen"'+(W()&&list.length?'':' disabled')+'>写真から読み込む</button></div>'+(S.impMsg?'<div class="banner ok">'+esc(S.impMsg)+'</div>':'')+
   '<div class="toolbar"><div class="totals"><span>受講予定 <b>'+tl+'</b> コマ</span><span>演習予定 <b>'+te+'</b> ステージ</span><span>登校予定 <b>'+ta+'</b> 回</span></div></div>';
   if(!list.length)return h+emptyStudents();
+  h+=vToday(list);
   const dis=W()?'':' disabled';
   h+='<div class="list">'+groupByGrade(list,s=>{
     const ps=days.map(d=>prow(d,s.id)||{});
@@ -1099,6 +1139,8 @@ document.addEventListener('click',ev=>{
       editDay(sid,r=>{r.komas=r.komas||{};r.komas[id]=[...(r.komas[id]||[]),n];r.courses[id]=(Number(r.courses[id])||0)+1});break}
     case 'kdel':{const i=Number(t.dataset.i);editDay(sid,r=>{r.komas=r.komas||{};const a=[...(r.komas[id]||[])];if(i<0||i>=a.length)return;a.splice(i,1);r.komas[id]=a;r.courses[id]=Math.max(0,(Number(r.courses[id])||0)-1)});break}
     case 'dh':editDay(sid,r=>{r.hm[id]=Math.max(0,(Number(r.hm[id])||0)+d)});break;
+    case 'tday':S.todayDate=addDays(S.todayDate||today(),d);render();break;
+    case 'tdaynow':S.todayDate=null;render();break;
     case 'pweek':S.impMsg='';S.planStart=addDays(S.planStart,d);render();break;
     case 'patt':editPlan(t.dataset.date,sid,p=>{p.attend=!p.attend});break;
     case 'copyplan':copyPlan();break;
