@@ -574,7 +574,13 @@ function editDay(sid,fn){const r=clone(row(S.date,sid)||{attend:false,courses:{}
 // --- 写真から読み込む（予定表の紙を読み取って週の予定に入れる） ---
 const ROMAN='ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ';
 function normName(x){return String(x||'').replace(/[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]/g,c=>String(ROMAN.indexOf(c)+1)).normalize('NFKC').toLowerCase().replace(/iii/g,'3').replace(/ii/g,'2').replace(/[\s・\-_]|組|講|コマ|第/g,'')}
-function splitRaw(raw){const m=String(raw||'').match(/^(.*?)(\d+)\s*(?:講|コマ)?\s*$/);return m?{prefix:m[1],koma:Number(m[2])}:{prefix:String(raw||''),koma:0}}
+// 1〜10講が part1、11〜20講が part2（「part2 2」＝第12講）
+const PART_SIZE=10;
+function splitRaw(raw){
+  const t=String(raw||'').normalize('NFKC');
+  const pm=t.match(/^(.*?)(?:part|パート|ぱーと|p)\s*\.?\s*([1-9])\s*(?:[-ー−_の\s]\s*)*(\d+)\s*(?:講|コマ|こま)?\s*$/i);
+  if(pm)return {prefix:pm[1],koma:(Number(pm[2])-1)*PART_SIZE+Number(pm[3]),part:true};
+  const m=String(raw||'').match(/^(.*?)(\d+)\s*(?:講|コマ)?\s*$/);return m?{prefix:m[1],koma:Number(m[2])}:{prefix:String(raw||''),koma:0}}
 // 講座がどの科目か。ここに載っていない講座は、名前に「英」→英語、「数」→数学
 const SUBJECTS={'英語':['C組','D組','E組','武藤のレベルアップ']};
 const SUBJ_ABBR={'英語':['英','英語'],'数学':['数','数学']};
@@ -605,7 +611,7 @@ function impPrompt(s){
   '年は'+year+'年とする。月が省略された日付は前後の日付から補う。表の列は左から1日ずつ続く日付なので、最初に「10/19」と書いて次から「/20」「/21」のように月を省いて書く生徒がいる。このとき「/」が「1」に見えて「1/20」のように見えることがあるが、前の列が10/19なら次は10/20と読む。ただし月がはっきり書き分けてある場合（例：10/31 の次が 11/1）は、書いてある月を使う。days は紙の列の順（左上の表の左から、続けて下の表の左から）に並べる。日付が書かれていない列は出力しない。\n'+
   (s?'この生徒が登録している講座：'+JSON.stringify(courseInfo(s))+'\nこの生徒が受講している高マスの単元：'+JSON.stringify(sUnits(s).map(u=>({id:u.id,name:u.name})))+'（空なら高マスは出力しない）\n'
     :'生徒名簿（sid・氏名・学年・講座・受講している高マスの単元id）：'+JSON.stringify(roster)+'\n氏名欄の手書きの名前から、名簿の生徒を1人選んで sid に入れる。名字だけ・崩し字・似た字でも、名簿の中で最も当てはまる生徒を選ぶ。決められなければ sid は null。受講と高マスは、その生徒の講座・単元から選ぶ。高マスの単元id：tango=単語、jukugo=熟語、bunpo=文法。\n')+
-  '受講は、講座一覧から最も当てはまるものの id を course に入れる。略記、全角と半角、「Ⅱ」「II」「2」の違い、「組」「講」の有無は同じものとみなす。「英18」「数10」のように科目名（英・英語・数・数学）だけで書かれた場合は、その科目（subject）の講座のうち finished が false のものを選ぶ（例：英語の講座がC組とD組で、D組が finished なら「英18」はC組の第18講）。どれか決められなければ course は null。koma は講の番号（数字）。講座名だけで番号が書かれていなければ koma は null（受講することだけ分かればよい）。\n\n'+
+  '受講は、講座一覧から最も当てはまるものの id を course に入れる。略記、全角と半角、「Ⅱ」「II」「2」の違い、「組」「講」の有無は同じものとみなす。「英18」「数10」のように科目名（英・英語・数・数学）だけで書かれた場合は、その科目（subject）の講座のうち finished が false のものを選ぶ（例：英語の講座がC組とD組で、D組が finished なら「英18」はC組の第18講）。どれか決められなければ course は null。koma は講の番号（数字）。講座は1〜10講が part1、11〜20講が part2 に分かれていて、「part2 2」「パート2の3」「p2-2」のように書かれていたら koma は (part−1)×10＋数字（part2 2 なら 12、part1 5 なら 5）。講座名がなく part だけ書いてあれば、受講中（finished が false）の講座が1つならそれを選ぶ。講座名だけで番号が書かれていなければ koma は null（受講することだけ分かればよい）。\n\n'+
   'JSONだけで答える。形：\n{"name":"氏名欄の文字",'+(s?'':'"sid":"名簿のsid",')+'"days":[{"date":"'+year+'-10-16","dow":"金","attend":false,"time":"","lectures":[{"raw":"C14","course":"講座のid","koma":14}],"hm":[{"raw":"単語3","unit":"tango","stages":3}],"unsure":[]}]}\n'+
   'attend：「有」に丸→true、「無」に丸→false、どちらにも丸がない→null。time は "HH:MM"（24時間表記、書かれていなければ "" ／ 時間が書かれていないのは普通なので unsure にしない）。raw は紙に書かれた文字そのまま。読みにくい・自信がない項目は unsure に "date" "attend" "time" "lectures" "hm" のうち当てはまるものを入れる。';
 }
@@ -634,7 +640,8 @@ function normImport(raw,s){
     const tm=String(d.time||'').trim().match(/^(\d{1,2})[:：](\d{2})$/);const time=tm?pad(tm[1])+':'+tm[2]:'';
     const lectures=(Array.isArray(d.lectures)?d.lectures:[]).map(l=>{const rawTxt=String(l&&l.raw||'');
       const course=(s.courses||[]).some(c=>c.id===l.course)?l.course:matchCourse(s,rawTxt);
-      const koma=Math.max(0,Math.round(Number(l.koma)||splitRaw(rawTxt).koma||0));
+      const sp=splitRaw(rawTxt);
+      const koma=Math.max(0,Math.round(sp.part?sp.koma:(Number(l.koma)||sp.koma||0)));
       if(!course)unsure.push('lectures');return {raw:rawTxt,course:course||'',koma}});
     const hm={};for(const h of (Array.isArray(d.hm)?d.hm:[])){const u=units.find(x=>x.id===h.unit)||units.find(x=>String(h.raw||'').includes(x.name));
       if(u)hm[u.id]=(hm[u.id]||0)+Math.max(0,Math.round(Number(h.stages)||0));else unsure.push('hm')}
