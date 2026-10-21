@@ -37,8 +37,10 @@ export default {
       if (!users.length || users[0].email !== STAFF_EMAIL) return reply({ error: 'auth' });
 
       // 2. 中身を確かめる
+      // 写真の読み取りは写真1〜3枚。分析のまとめ（mode: 'text'）は写真なし
       const images = Array.isArray(req.images) ? req.images : [];
-      if (!images.length || images.length > MAX_IMAGES || typeof req.prompt !== 'string' || req.prompt.length > MAX_PROMPT_CHARS) {
+      const textOnly = req.mode === 'text';
+      if ((!textOnly && !images.length) || images.length > MAX_IMAGES || typeof req.prompt !== 'string' || req.prompt.length > MAX_PROMPT_CHARS) {
         return reply({ error: 'bad_request' });
       }
       if (!env.ANTHROPIC_API_KEY) return reply({ error: 'no_key' });

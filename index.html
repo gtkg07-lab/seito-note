@@ -246,6 +246,24 @@ td.ttime{font-family:var(--f-num);font-weight:700;font-size:15px;color:var(--tod
 .tchip b{color:var(--accent)}
 .tchip.hm{background:var(--good-soft)}
 .tchip.hm b{color:var(--good)}
+.sbadges{display:flex;flex-wrap:wrap;gap:3px;margin-top:3px}
+.sb{display:inline-block;font-size:11px;font-weight:700;border-radius:5px;padding:1px 6px;margin:1px 3px 1px 0;background:var(--sunk);color:var(--ink-2)}
+.sb.bad{background:var(--bad-soft);color:var(--bad)}
+.sb.warn{background:var(--warn-soft);color:var(--warn)}
+.sb.note{background:var(--today-bg);color:var(--today-ink)}
+.sb.ev{background:var(--accent-soft);color:var(--accent)}
+.ctb{grid-column:1/-1;display:flex;gap:4px;flex-wrap:wrap}
+.schbox{border:1px solid var(--line);border-radius:var(--r);padding:10px 12px}
+.schhead{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+.schrows{display:flex;flex-direction:column;gap:6px}
+.schrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.schrow input,.schrow select{border:1px solid var(--line);background:var(--bg);border-radius:6px;padding:4px 6px;font-size:13px}
+.schrow input:not([type=date]){width:11em}
+.aitext{white-space:pre-wrap;line-height:1.75;font-size:13.5px;background:var(--sunk);border-radius:8px;padding:12px 14px}
+.anacards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px}
+.anacard{border:1px solid var(--line);border-left:4px solid var(--bad);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:4px}
+.anacard .cause{font-size:12px;color:var(--ink-2)}
+.goodlist,.uplist{margin:0;padding-left:1.4em;display:flex;flex-direction:column;gap:4px;font-size:13px}
 .pk{font-size:10px;color:var(--accent);margin-top:2px;white-space:nowrap}
 .impprev{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
 .impthumb{max-width:220px;max-height:220px;border-radius:8px;border:1px solid var(--line);object-fit:contain;background:var(--sunk)}
@@ -332,6 +350,7 @@ body.locked header.top,body.locked main{visibility:hidden}
       <button role="tab" data-tab="plan">週の予定</button>
       <button role="tab" data-tab="week">週次サマリー</button>
       <button role="tab" data-tab="month">月次サマリー</button>
+      <button role="tab" data-tab="ana">分析</button>
       <button role="tab" data-tab="rank">ランキング</button>
       <button role="tab" data-tab="students">生徒</button>
     </nav>
@@ -374,7 +393,7 @@ function sname(s){const c=COLORS.find(x=>x.id===s.color);return '<b class="sname
 const FIRST_MONTH='2026-09';
 const DOW=['日','月','火','水','木','金','土'];
 
-const S={students:{},pdays:{},days:{},settings:{weekStartDow:1},
+const S={students:{},pdays:{},days:{},schools:{},schDraft:{},settings:{weekStartDow:1},
   tab:'daily',kpick:{},date:today(),weekStart:null,planStart:null,month:null,
   grade:'all',q:'',showArchived:false,editing:null,editErr:'',
   db:null,canWrite:true,loaded:{students:false,days:false,plans:false}};
@@ -444,7 +463,12 @@ function komaInput(s,c,r,D){
   const done=Math.min(courseDone(s,c),k);
   return '<span class="kgrp"><span class="nm" title="'+esc(c.name)+'">'+esc(c.name)+'</span>'+chips+leg+
     '<select class="ksel" id="ks-'+s.id+'-'+c.id+'" data-kpick="'+key+'" aria-label="'+esc(c.name)+'の受講したコマ"'+(W()?'':' disabled')+'>'+opts+'</select>'+
-    '<button class="kadd" data-act="kadd" data-sid="'+s.id+'" data-id="'+c.id+'"'+(W()?'':' disabled')+'>＋ 追加</button><small>'+done+'/'+k+(done>=k&&k?' 修了':'')+'</small></span>'}
+    '<button class="kadd" data-act="kadd" data-sid="'+s.id+'" data-id="'+c.id+'"'+(W()?'':' disabled')+'>＋ 追加</button><small>'+done+'/'+k+(done>=k&&k?' 修了':'')+'</small>'+komaTests(s,c,r,D,done,k)+'</span>'}
+function komaTests(s,c,r,D,done,k){const dis=W()?'':' disabled',ct=r.ctest?.[c.id]||{},out=[];
+  if(hasMid(c)&&done>=PART_SIZE&&!midPassed(s,c,null,D))out.push('<label class="final"><input type="checkbox" data-act="ctest" data-kind="mid" data-sid="'+s.id+'" data-id="'+c.id+'"'+(ct.mid?' checked':'')+dis+'> 中間テスト 合格</label>');
+  if(k&&done>=k){if(!finPassed(s,c,null,D))out.push('<label class="final"><input type="checkbox" data-act="ctest" data-kind="fin" data-sid="'+s.id+'" data-id="'+c.id+'"'+(ct.fin?' checked':'')+dis+'> 修了判定テスト 合格</label>');
+    else out.push('<span class="badge">修了判定 合格</span>')}
+  return out.join('')}
 function hmCleared(s,u,end){let t=Number(s.hmBase?.[u.id]?.cleared)||0;for(const d in S.days){if(end&&d>end)continue;t+=Number(S.days[d].rows?.[s.id]?.hm?.[u.id])||0}return t}
 function hmPassed(s,u,end,exceptDate){if(s.hmBase?.[u.id]?.passed)return true;for(const d in S.days){if(end&&d>end)continue;if(d===exceptDate)continue;if(S.days[d].rows?.[s.id]?.final?.[u.id])return true}return false}
 function rate(s,end){let tot=0,done=0;for(const c of s.courses||[]){const k=Number(c.koma)||0;tot+=k;done+=Math.min(courseDone(s,c,end),k)}return tot?{done,tot,r:done/tot}:null}
@@ -498,7 +522,7 @@ function render(){
   deferred=false;
   document.querySelectorAll('#tabs button').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===S.tab)));
   renderBanner();renderFilters();
-  const fn={daily:vDaily,plan:vPlan,week:vWeek,month:vMonth,rank:vRank,students:vStudents}[S.tab]||vDaily;
+  const fn={daily:vDaily,plan:vPlan,week:vWeek,month:vMonth,rank:vRank,ana:vAna,students:vStudents}[S.tab]||vDaily;
   const y=window.scrollY;
   // 横にスクロールする表（週の予定・読み取りの確認など）の位置も覚えておき、作り直した後に戻す
   const sx=[...v.querySelectorAll('.tablewrap')].map(e=>e.scrollLeft);
@@ -521,7 +545,7 @@ function renderBanner(){
 }
 function renderFilters(){
   const f=document.getElementById('filters');
-  if((S.tab==='students'&&(S.editing||S.reorder))||(S.tab==='plan'&&S.imp)){f.innerHTML='';return}
+  if((S.tab==='students'&&(S.editing||S.reorder||S.schoolEdit))||(S.tab==='plan'&&S.imp)){f.innerHTML='';return}
   const n=visible().length;
   if(document.getElementById('q')){
     f.querySelectorAll('.chip').forEach(b=>b.setAttribute('aria-pressed',String(S.grade===b.dataset.g)));
@@ -562,7 +586,7 @@ function vDaily(){
       if(passedElse)x+='<span class="badge">'+u.name+' 修得済</span>';
       else if(all>=u.stages)x+='<label class="final"><input type="checkbox" data-act="final" data-sid="'+s.id+'" data-id="'+u.id+'"'+(r.final?.[u.id]?' checked':'')+(W()?'':' disabled')+'> '+u.name+' 修了判定に合格</label>';
       return x}).join('');
-    return '<div class="srow"><div class="who">'+sname(s)+'<span class="grade">'+esc(s.grade)+'</span></div>'+
+    return '<div class="srow"><div class="who">'+sname(s)+'<span class="grade">'+esc(s.grade)+(schoolOf(s)?'・'+esc(schoolOf(s)):'')+'</span>'+schoolBadges(s,D)+'</div>'+
       '<button class="att" data-act="att" data-sid="'+s.id+'" aria-pressed="'+(!!r.attend)+'"'+(W()?'':' disabled')+'>'+(r.attend?'登校 ✓':'登校')+'</button>'+
       '<div class="cols"><div class="grp"><span class="lbl">受講</span>'+courses+'</div>'+(hm?'<div class="grp"><span class="lbl">高マス</span>'+hm+'</div>':'')+'</div></div>'}
   )+'</div><p class="note">受講は、受けたコマの番号を選んで「＋ 追加」を押します。同じコマをもう一度受けると「2回目」と表示されます。右の小さな数字は「これまでの累計 / 全体」です（同じコマの繰り返しは1回と数えます）。全ステージをクリアすると修了判定の欄が出ます。</p>';
@@ -587,7 +611,74 @@ const SUBJ_ABBR={'英語':['英','英語'],'数学':['数','数学']};
 function subjectOf(name){const n=normName(name);for(const k in SUBJECTS)if(SUBJECTS[k].some(x=>normName(x)===n))return k;
   const t=String(name||'');if(t.includes('英'))return '英語';if(t.includes('数'))return '数学';return ''}
 // 修得済み（自分でチェック、または全コマ受講済み）の講座は、略記の候補から外す
-function courseFinished(s,c){return !!c.finished||courseDone(s,c)>=(Number(c.koma)||20)}
+function courseFinished(s,c){return !!c.finished||finPassed(s,c)||courseDone(s,c)>=(Number(c.koma)||20)}
+// --- 受講のテスト（中間テスト：10講と11講の間、修了判定テスト：最後の講のあと） ---
+function hasMid(c){return (Number(c.koma)||0)>PART_SIZE}
+// これまでに受けた一番大きい講の番号（開始前の受講済みも含む）
+function maxKoma(s,c,end){let m=Number(c.baseDone)||0;for(const d in S.days){if(end&&d>end)continue;for(const k of S.days[d].rows?.[s.id]?.komas?.[c.id]||[])if(k>m)m=k}return m}
+function ctestDone(s,c,kind,end,exceptDate){
+  if(kind==='mid'&&c.midDone)return true;if(kind==='fin'&&c.finDone)return true;
+  for(const d in S.days){if(end&&d>end)continue;if(d===exceptDate)continue;if(S.days[d].rows?.[s.id]?.ctest?.[c.id]?.[kind])return true}return false}
+// 11講目を始めていれば、中間テストは終わっていると考える
+function midPassed(s,c,end,exceptDate){return !hasMid(c)||ctestDone(s,c,'mid',end,exceptDate)||maxKoma(s,c,end)>PART_SIZE}
+function finPassed(s,c,end,exceptDate){return ctestDone(s,c,'fin',end,exceptDate)}
+function courseTestBadges(s,c){const k=Number(c.koma)||0,d=Math.min(courseDone(s,c),k),out=[];
+  if(hasMid(c)){if(midPassed(s,c))out.push('<span class="badge">中間✓</span>');else if(d>=PART_SIZE)out.push('<span class="badge warn">中間テスト待ち</span>')}
+  if(finPassed(s,c))out.push('<span class="badge">修了判定 合格</span>');else if(k&&d>=k)out.push('<span class="badge warn">修了判定待ち</span>');
+  return out.join(' ')}
+
+// --- 学校の予定（定期テスト・行事） ---
+const EV_TYPES={test:'定期テスト',fest:'文化祭',sports:'体育祭',trip:'修学旅行',other:'その他の行事'};
+function schoolOf(s){return String(s.school||'').trim()}
+function schoolId(name){return String(name).replace(/[\/\s]/g,'_').slice(0,200)||'_'}
+function schoolEvents(name){return (S.schools[schoolId(name)]?.events)||[]}
+function dayDiff(a,b){return Math.round((toUTC(b)-toUTC(a))/864e5)}
+function evRange(e){const en=e.end&&e.end>=e.start?e.end:e.start;return md(e.start)+(en!==e.start?'〜'+md(en):'')}
+// その日の、学校のテスト・行事の状況（テスト当日／1週間前／2週間前）
+function schoolStatus(s,D){
+  const ev=schoolEvents(schoolOf(s)),out=[];
+  for(const e of ev){if(!e.start)continue;const en=e.end&&e.end>=e.start?e.end:e.start;
+    if(D>=e.start&&D<=en)out.push(e.type==='test'?{cls:'bad',txt:'テスト当日：'+(e.name||'定期テスト')}:{cls:'ev',txt:(e.name||EV_TYPES[e.type]||'行事')})}
+  if(!out.some(x=>x.cls==='bad')){
+    const up=ev.filter(e=>e.type==='test'&&e.start>D).sort((a,b)=>a.start<b.start?-1:1)[0];
+    if(up){const n=dayDiff(D,up.start);
+      if(n<=7)out.push({cls:'warn',txt:'テスト1週間前（あと'+n+'日・'+(up.name||'定期テスト')+' '+evRange(up)+'）'});
+      else if(n<=14)out.push({cls:'note',txt:'テスト2週間前（あと'+n+'日・'+(up.name||'定期テスト')+' '+evRange(up)+'）'})}}
+  return out}
+function schoolBadges(s,D){const st=schoolStatus(s,D);return st.length?'<div class="sbadges">'+st.map(x=>'<span class="sb '+x.cls+'">'+esc(x.txt)+'</span>').join('')+'</div>':''}
+
+// 学校の予定の編集画面（生徒タブから開く）
+function schoolNames(){const set=new Map();for(const s of allStudents()){if(s.archived)continue;const n=schoolOf(s);if(!n)continue;set.set(n,(set.get(n)||0)+1)}
+  for(const k in S.schools){const n=S.schools[k].name;if(n&&!set.has(n))set.set(n,0)}return [...set.entries()].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0],'ja'))}
+function vSchools(){
+  const names=schoolNames();
+  let h='<div class="editor"><h3>学校の予定（定期テスト・行事）</h3><p class="lead" style="margin:0">生徒の高校ごとに、定期テストと行事（文化祭・体育祭など）の日にちを登録します。登録すると「日々の実績」にテスト当日・1週間前・2週間前が出て、「分析」で登校や受講が減った原因の候補として使われます。多くの学校はテストの日程を公開していないので、生徒に聞いて入れてください。</p>'+
+    '<div class="toolbar" style="margin:0"><button class="btn" data-act="schclose">閉じる</button></div>';
+  if(!names.length)return h+'<p class="none">生徒の高校名がまだ登録されていません。生徒の編集画面で高校名を入れてください。</p></div>';
+  for(const [name,cnt] of names){
+    const id=schoolId(name),dr=S.schDraft[id]||(S.schDraft[id]=clone(schoolEvents(name)));
+    const saved=JSON.stringify(schoolEvents(name))===JSON.stringify(dr);
+    const tests=dr.filter(e=>e.type==='test').length;
+    h+='<section class="schbox"><div class="schhead"><b>'+esc(name)+'</b><span class="of">生徒 '+cnt+'名</span>'+(tests?'':'<span class="badge warn">テスト日程が未登録</span>')+(saved?'':'<span class="badge bad">未保存</span>')+'</div>'+
+      (dr.length?'<div class="schrows">'+dr.map((e,i)=>'<div class="schrow"><select data-sch="'+id+'" data-ei="'+i+'" data-f="type" aria-label="種類">'+Object.entries(EV_TYPES).map(([k,v])=>'<option value="'+k+'"'+(e.type===k?' selected':'')+'>'+v+'</option>').join('')+'</select>'+
+        '<input data-sch="'+id+'" data-ei="'+i+'" data-f="name" value="'+esc(e.name||'')+'" placeholder="名前（例：2学期期末）" aria-label="名前">'+
+        '<input type="date" data-sch="'+id+'" data-ei="'+i+'" data-f="start" value="'+esc(e.start||'')+'" aria-label="始まり"><span>〜</span><input type="date" data-sch="'+id+'" data-ei="'+i+'" data-f="end" value="'+esc(e.end||'')+'" aria-label="終わり（1日だけなら空）">'+
+        (e.note?'<span class="rnote" style="margin:0">'+esc(e.note)+'</span>':'')+
+        '<button class="btn ghost xs" data-act="schdel" data-sch="'+id+'" data-ei="'+i+'" aria-label="この予定を消す">×</button></div>').join('')+'</div>':'<p class="none" style="margin:4px 0">予定はまだありません。</p>')+
+      '<div class="toolbar" style="margin:6px 0 0"><button class="btn xs" data-act="schadd" data-sch="'+id+'" data-type="test">＋ 定期テスト</button><button class="btn xs" data-act="schadd" data-sch="'+id+'" data-type="fest">＋ 行事</button>'+
+      '<button class="btn primary xs" data-act="schsave" data-sch="'+id+'" data-name="'+esc(name)+'"'+(saved||!W()?' disabled':'')+'>保存</button></div></section>';
+  }
+  return h+'</div>';
+}
+function schEdit(t){const e=(S.schDraft[t.dataset.sch]||[])[Number(t.dataset.ei)];if(e)e[t.dataset.f]=t.value}
+async function saveSchool(id,name){
+  const dr=(S.schDraft[id]||[]).filter(e=>e.start).map(e=>({type:e.type||'test',name:String(e.name||'').trim(),start:e.start,end:e.end&&e.end>=e.start?e.end:'',note:e.note||''}))
+    .sort((a,b)=>a.start<b.start?-1:1);
+  const ok=await writeDoc('schools/'+id,{name,events:dr},false);
+  if(ok){S.schools[id]={name,events:dr};S.schDraft[id]=clone(dr)}
+  render();
+}
+
 // 「C14」「数2 10」「英18」のような略記から、その生徒の講座を1つに決める（決められなければ null）
 function matchCourse(s,raw){const pre=normName(splitRaw(raw).prefix);if(!pre)return null;
   const cs=s.courses||[],open=cs.filter(c=>!courseFinished(s,c));
@@ -857,8 +948,8 @@ function vToday(list){
   const none='<span class="none">—</span>';
   let prev=null;
   const goRows=go.map(r=>{const first=r.t!==prev;prev=r.t;
-    return '<tr class="'+(first?'tgrp':'')+'"><td class="l ttime">'+(first?(r.t||'<span class="none">時間未定</span>'):'')+'</td><td class="l">'+sname(r.s)+' <span class="of">'+esc(r.s.grade)+'</span></td><td class="l">'+(r.lec.join('')||none)+'</td><td class="l">'+(r.hm.join('')||none)+'</td></tr>'}).join('');
-  const homeRows=home.map(r=>'<tr><td class="l">'+sname(r.s)+' <span class="of">'+esc(r.s.grade)+'</span></td><td class="l">'+(r.lec.join('')||none)+'</td><td class="l">'+(r.hm.join('')||none)+'</td></tr>').join('');
+    return '<tr class="'+(first?'tgrp':'')+'"><td class="l ttime">'+(first?(r.t||'<span class="none">時間未定</span>'):'')+'</td><td class="l">'+sname(r.s)+' <span class="of">'+esc(r.s.grade)+'</span>'+schoolBadges(r.s,D)+'</td><td class="l">'+(r.lec.join('')||none)+'</td><td class="l">'+(r.hm.join('')||none)+'</td></tr>'}).join('');
+  const homeRows=home.map(r=>'<tr><td class="l">'+sname(r.s)+' <span class="of">'+esc(r.s.grade)+'</span>'+schoolBadges(r.s,D)+'</td><td class="l">'+(r.lec.join('')||none)+'</td><td class="l">'+(r.hm.join('')||none)+'</td></tr>').join('');
   return '<section class="panel today-panel"><div class="tphead"><h3>'+(isT?'本日の予定':fmtDay(D)+'の予定')+' <span class="range">'+fmtDay(D)+'</span></h3>'+
     '<div class="tpnav"><button class="btn xs" data-act="tday" data-d="-1" aria-label="前の日">◀</button>'+(isT?'':'<button class="btn xs" data-act="tdaynow">今日</button>')+'<button class="btn xs" data-act="tday" data-d="1" aria-label="次の日">▶</button></div>'+
     '<div class="totals"><span>登校予定 <b>'+go.length+'</b> 名</span><span>自宅受講 <b>'+home.length+'</b> 名</span></div></div>'+
@@ -1062,16 +1153,111 @@ function vRank(){
 
 // --- 生徒 ---
 function blankStudent(){const hb={};UNITS.forEach(u=>hb[u.id]={cleared:0,passed:false});return {name:'',grade:'高1',school:'',memo:'',archived:false,courses:[{id:uid('c'),name:'',koma:20,baseDone:0}],hmBase:hb,hmUnits:Object.fromEntries(UNITS.map(u=>[u.id,false]))}}
+// --- 分析 ---
+const ANA_RANGES=[['7','直近1週間'],['14','直近2週間'],['28','直近4週間'],['month','今月'],['all','記録の最初から']];
+function anaRange(){
+  const b=today(),r=S.anaRange||'28';
+  let a=r==='month'?b.slice(0,7)+'-01':r==='all'?FIRST_MONTH+'-01':addDays(b,-(Number(r)-1));
+  const n=dayDiff(a,b)+1;return {a,b,n,pa:addDays(a,-n),pb:addDays(a,-1)}}
+function lastDate(sid,pred,end){let best='';for(const d in S.days){if(d>end)continue;const r=S.days[d].rows?.[sid];if(r&&pred(r)&&d>best)best=d}return best}
+// 生徒ごとの数字と、気になる点・原因の候補
+function anaStudent(s,R){
+  const c=stats(s.id,R.a,R.b),p=stats(s.id,R.pa,R.pb),pl=planTot(s.id,R.a,R.b),rt=rate(s,R.b);
+  const lastAtt=lastDate(s.id,r=>r.attend,R.b),lastLec=lastDate(s.id,r=>sumObj(r.courses)>0,R.b);
+  const sinceAtt=lastAtt?dayDiff(lastAtt,R.b):null,sinceLec=lastLec?dayDiff(lastLec,R.b):null;
+  const weeks=Math.max(1,R.n/7),pace=c.lec/weeks;
+  let remain=0;for(const co of s.courses||[]){if(courseFinished(s,co))continue;remain+=Math.max(0,(Number(co.koma)||0)-courseDone(s,co))}
+  const units=sUnits(s).filter(u=>!hmPassed(s,u));
+  const pend=[];for(const co of s.courses||[]){const k=Number(co.koma)||0,d=Math.min(courseDone(s,co),k);
+    if(hasMid(co)&&d>=PART_SIZE&&!midPassed(s,co))pend.push(co.name+' 中間テスト');
+    if(k&&d>=k&&!finPassed(s,co))pend.push(co.name+' 修了判定テスト')}
+  for(const u of sUnits(s)){if(!hmPassed(s,u)&&hmCleared(s,u)>=u.stages)pend.push('高マス'+u.name+' 修了判定')}
+  const alerts=[];
+  if(sinceAtt==null)alerts.push({k:'att',txt:'登校の記録がない'});else if(sinceAtt>=7)alerts.push({k:'att',txt:sinceAtt+'日間登校なし（最後 '+md(lastAtt)+'）',from:addDays(lastAtt,1)});
+  if(remain>0){if(sinceLec==null)alerts.push({k:'lec',txt:'受講の記録がない'});else if(sinceLec>=7)alerts.push({k:'lec',txt:sinceLec+'日間受講なし（最後 '+md(lastLec)+'）',from:addDays(lastLec,1)})}
+  if(pl.lec>0&&c.lec<pl.lec*0.5)alerts.push({k:'plan',txt:'受講が予定の半分未満（'+c.lec+'/'+pl.lec+'コマ）',from:R.a});
+  if(units.length&&c.ex===0)alerts.push({k:'hm',txt:'高マスが止まっている（'+units.map(u=>u.name).join('・')+'）',from:R.a});
+  if(p.lec>=3&&c.lec<=p.lec/2)alerts.push({k:'drop',txt:'受講が前の期間の半分以下（'+p.lec+'→'+c.lec+'コマ）',from:R.a});
+  // 原因の候補：学校の予定（テスト・行事）と重なっているか
+  const ev=schoolEvents(schoolOf(s)),causes=[];
+  const from=alerts.filter(x=>x.from).map(x=>x.from).sort()[0];
+  if(from){for(const e of ev){if(!e.start)continue;const en=e.end&&e.end>=e.start?e.end:e.start;
+      const near=e.type==='test'?addDays(e.start,-14):e.start; // テストは2週間前から
+      if(en>=from&&near<=R.b)causes.push((e.type==='test'?(e.start>R.b?'定期テストの前（':'定期テスト（'):'')+(e.name||EV_TYPES[e.type])+' '+evRange(e)+(e.type==='test'?'）':''))}}
+  const cause=!alerts.length?'':causes.length?causes.join('、'):(ev.length?'不明（学校の予定とは重なっていない）':'不明（学校の予定が未登録）');
+  const score=c.att*1+c.lec*2+c.ex*0.3+(pl.lec?Math.min(1.5,c.lec/pl.lec)*3:0);
+  return {s,c,p,pl,rt,lastAtt,lastLec,sinceAtt,sinceLec,pace,remain,eta:pace>0&&remain?Math.ceil(remain/pace):null,pend,alerts,cause,score};
+}
+function anaPrompt(R,rows){
+  const L=rows.map(x=>[x.s.name+'（'+x.s.grade+(schoolOf(x.s)?'・'+schoolOf(x.s):'')+'）',
+    '登校'+x.c.att+'日（前の期間'+x.p.att+'）','受講'+x.c.lec+'コマ（前'+x.p.lec+'）'+(x.pl.lec?'・予定'+x.pl.lec:''),'高マス'+x.c.ex,
+    '修了率'+(x.rt?Math.round(x.rt.r*100)+'%':'-'),x.lastAtt?'最終登校'+md(x.lastAtt):'登校記録なし',x.alerts.length?'気になる点:'+x.alerts.map(a=>a.txt).join('/'):'',x.cause?'学校の予定:'+x.cause:'',x.pend.length?'受けるべきテスト:'+x.pend.join('/'):''].filter(Boolean).join(' ')).join('\n');
+  return '塾（東進）の担任助手チーム向けに、生徒の受講・高マス（高速基礎マスター）・登校の記録をまとめた分析コメントを書いてください。期間：'+md(R.a)+'〜'+md(R.b)+'（'+R.n+'日間、比較は直前の同じ長さの期間）。\n\n'+L+
+  '\n\n書き方：日本語で、見出し付きの短い箇条書き。見出しは「全体の様子」「気になる生徒」「よく頑張っている生徒」「原因の見立て」「担任助手への提案」の5つ。原因は、上に書いた学校の予定（定期テスト・文化祭・体育祭など）から言えることだけを書き、それ以外は「不明」とする。上のデータにない事実は作らない。全体で600字程度。';
+}
+async function runAnaAI(){
+  if(!S.sample||!S.sample.text)return;
+  const R=anaRange(),rows=visible().map(s=>anaStudent(s,R));
+  S.anaBusy=true;S.anaErr='';render();
+  try{const text=await S.sample.text(anaPrompt(R,rows));
+    const doc={text,at:new Date().toISOString(),range:md(R.a)+'〜'+md(R.b)};S.anaAI=doc;await writeDoc('settings/analysis',doc,false)}
+  catch(e){S.anaErr=e&&e.code==='bad_request'?'中継役（Cloudflare）のプログラムの更新が必要です。管理者に伝えてください。':impErr(e)||'うまくいきませんでした。もう一度押してください。'}
+  S.anaBusy=false;render();
+}
+function vAna(){
+  const R=anaRange(),list=visible();
+  let h='<h2>分析</h2><p class="lead">これまでの記録から、受講・高マス・登校の進み具合と、気になる生徒、その原因の候補（学校のテストや行事）をまとめます。</p>'+
+    '<div class="toolbar"><div class="chips">'+ANA_RANGES.map(([k,v])=>'<button class="chip" data-act="anarange" data-r="'+k+'" aria-pressed="'+((S.anaRange||'28')===k)+'">'+v+'</button>').join('')+'</div>'+
+    '<span class="range">'+fmtDay(R.a)+' 〜 '+fmtDay(R.b)+'（'+R.n+'日間）　比較：'+fmtDay(R.pa)+' 〜 '+fmtDay(R.pb)+'</span></div>';
+  if(!list.length)return h+emptyStudents();
+  const rows=list.map(s=>anaStudent(s,R)),n=rows.length;
+  const T=(k,w)=>rows.reduce((a,x)=>a+x[w][k],0),PL=k=>rows.reduce((a,x)=>a+x.pl[k],0);
+  const weeks=Math.max(1,R.n/7),warn=rows.filter(x=>x.alerts.length);
+  const pct=(a,b)=>b?Math.round(a/b*100)+'%':'—';
+  h+='<div class="tiles">'+
+    '<div class="tile"><span class="k">1人あたりの登校（週）</span><span class="v">'+(T('att','c')/n/weeks).toFixed(1)+'<small>日</small></span><span class="sub">前の期間 '+(T('att','p')/n/weeks).toFixed(1)+' '+delta(T('att','c'),T('att','p'))+'</span></div>'+
+    '<div class="tile"><span class="k">1人あたりの受講（週）</span><span class="v">'+(T('lec','c')/n/weeks).toFixed(1)+'<small>コマ</small></span><span class="sub">前の期間 '+(T('lec','p')/n/weeks).toFixed(1)+' '+delta(T('lec','c'),T('lec','p'))+'</span></div>'+
+    '<div class="tile"><span class="k">予定の達成率</span><span class="v">'+pct(T('lec','c'),PL('lec'))+'</span><span class="sub">受講 '+T('lec','c')+'/'+PL('lec')+'　登校 '+pct(T('att','c'),PL('att'))+'</span></div>'+
+    '<div class="tile"><span class="k">高マス演習</span><span class="v">'+T('ex','c')+'<small>ステージ</small></span><span class="sub">前の期間 '+T('ex','p')+' '+delta(T('ex','c'),T('ex','p'))+'</span></div>'+
+    '<div class="tile"><span class="k">気になる生徒</span><span class="v">'+warn.length+'<small>名 / '+n+'名</small></span><span class="sub">下の「気になる生徒」を見てください</span></div></div>';
+  // AIのまとめ
+  const ai=S.anaAI;
+  h+='<section class="panel"><h3>AIのまとめ</h3>'+(ai?'<div class="aitext">'+esc(ai.text)+'</div><p class="note">作成：'+esc(String(ai.at).slice(0,16).replace('T',' '))+'（期間 '+esc(ai.range||'')+'）</p>':'<p class="none">まだ作られていません。</p>')+
+    (S.anaErr?'<div class="err-msg">'+esc(S.anaErr)+'</div>':'')+
+    '<button class="btn primary" data-act="anaai"'+(S.anaBusy||!S.sample||!W()?' disabled':'')+'>'+(S.anaBusy?'作成中…（30秒ほど）':ai?'今の期間で作り直す':'AIにまとめてもらう')+'</button><span class="rnote" style="margin-left:8px">1回1〜3円ほどかかります。作ったまとめは全員の画面に出ます。</span></section>';
+  // 気になる生徒
+  warn.sort((a,b)=>b.alerts.length-a.alerts.length||a.score-b.score);
+  h+='<section class="panel"><h3>気になる生徒（'+warn.length+'名）</h3>'+(warn.length?'<div class="anacards">'+warn.map(x=>'<div class="anacard"><div class="ah">'+sname(x.s)+' <span class="of">'+esc(x.s.grade)+(schoolOf(x.s)?'・'+esc(schoolOf(x.s)):'')+'</span></div>'+
+      '<div>'+x.alerts.map(a=>'<span class="sb bad">'+esc(a.txt)+'</span>').join('')+'</div><div class="cause"><b>原因の候補：</b>'+esc(x.cause)+'</div></div>').join('')+'</div>':'<p class="none">気になる生徒はいません。</p>')+
+    '<p class="note">気になる点：7日以上登校・受講なし、受講が予定の半分未満、前の期間より受講が半分以下、高マスの停滞。原因の候補は、その生徒の学校の予定（定期テストとその2週間前、文化祭・体育祭など）と重なるかで判断しています。</p></section>';
+  // よく頑張っている生徒
+  const good=rows.filter(x=>!x.alerts.length).sort((a,b)=>b.score-a.score).slice(0,5);
+  h+='<section class="panel"><h3>よく頑張っている生徒</h3>'+(good.length?'<ol class="goodlist">'+good.map(x=>'<li>'+sname(x.s)+' <span class="of">登校'+x.c.att+'日・受講'+x.c.lec+'コマ'+(x.pl.lec?'（予定の'+pct(x.c.lec,x.pl.lec)+'）':'')+(x.c.ex?'・高マス'+x.c.ex+'ステージ':'')+'</span></li>').join('')+'</ol>':'<p class="none">該当なし</p>')+'</section>';
+  // これからの学校の予定
+  const up=[];for(const [name] of schoolNames())for(const e of schoolEvents(name)){if(!e.start)continue;const en=e.end||e.start;if(en>=R.b&&dayDiff(R.b,e.start)<=30)up.push({name,e,who:list.filter(s=>schoolOf(s)===name)})}
+  up.sort((a,b)=>a.e.start<b.e.start?-1:1);
+  h+='<section class="panel"><h3>これから30日の学校の予定</h3>'+(up.length?'<ul class="uplist">'+up.map(u=>'<li><b>'+esc(evRange(u.e))+'</b> '+esc(u.name)+'：'+esc(u.e.name||EV_TYPES[u.e.type])+' <span class="of">'+u.who.map(s=>esc(s.name)).join('・')+'</span></li>').join('')+'</ul>':'<p class="none">登録されている予定はありません。「生徒」→「学校の予定」から登録できます。</p>')+'</section>';
+  // 生徒ごとの状況
+  h+='<div class="tablewrap"><table><thead><tr><th class="l">生徒</th><th>登校</th><th>最終登校</th><th>受講</th><th>予定比</th><th>受講ペース</th><th>修了まで</th><th>修了率</th><th>高マス</th><th class="l">受けるべきテスト</th></tr></thead><tbody>'+
+    rows.sort((a,b)=>b.alerts.length-a.alerts.length||a.score-b.score).map(x=>'<tr class="'+(x.alerts.length?'flag':'')+'"><td class="l">'+sname(x.s)+' <span class="of">'+esc(x.s.grade)+'</span></td>'+
+      '<td>'+cmp(x.p.att,x.c.att)+'</td><td class="num">'+(x.lastAtt?md(x.lastAtt)+'<span class="of">（'+x.sinceAtt+'日前）</span>':'—')+'</td>'+
+      '<td>'+cmp(x.p.lec,x.c.lec)+'</td><td class="num">'+(x.pl.lec?pct(x.c.lec,x.pl.lec):'—')+'</td><td class="num">'+x.pace.toFixed(1)+'<span class="of">コマ/週</span></td>'+
+      '<td class="num">'+(x.remain?(x.eta?'約'+x.eta+'週':'—')+'<span class="of">（残'+x.remain+'）</span>':'<span class="badge">完了</span>')+'</td><td class="num">'+(x.rt?pct(x.rt.done,x.rt.tot):'—')+'</td>'+
+      '<td>'+cmp(x.p.ex,x.c.ex)+'</td><td class="l">'+(x.pend.map(t=>'<span class="badge warn">'+esc(t)+'</span>').join(' ')||'—')+'</td></tr>').join('')+'</tbody></table></div>'+
+    '<p class="note">「修了まで」は、取っている講座の残りコマを、この期間の受講ペースで割った目安です。</p>';
+  return h;
+}
 function vStudents(){
   let h='<h2>生徒</h2><p class="lead">生徒の名前と、受講している講座を登録します。アプリを使い始める前の進み具合も入れておくと、受講修了率と高マスの進み具合が正しく出ます。</p>';
   if(S.editing)return h+vEditor();
   if(S.reorder)return h+vReorder();
-  h+='<div class="toolbar"><button class="btn primary" data-act="new"'+(W()?'':' disabled')+'>＋ 生徒を追加</button><button class="btn" data-act="reorder"'+(W()&&allStudents().some(s=>!s.archived)?'':' disabled')+'>並び順を変える</button><span class="sep"></span><label class="inline"><input type="checkbox" id="showArch"'+(S.showArchived?' checked':'')+'> 非表示にした生徒も出す</label></div>';
+  if(S.schoolEdit)return h+vSchools();
+  h+='<div class="toolbar"><button class="btn primary" data-act="new"'+(W()?'':' disabled')+'>＋ 生徒を追加</button><button class="btn" data-act="schopen">学校の予定（テスト・行事）</button><button class="btn" data-act="reorder"'+(W()&&allStudents().some(s=>!s.archived)?'':' disabled')+'>並び順を変える</button><span class="sep"></span><label class="inline"><input type="checkbox" id="showArch"'+(S.showArchived?' checked':'')+'> 非表示にした生徒も出す</label></div>';
   const list=allStudents().filter(s=>(S.showArchived||!s.archived)&&(S.grade==='all'||s.grade===S.grade)&&(!S.q||String(s.name).includes(S.q)));
   if(!S.loaded.students)return h+'<div class="empty"><b>読み込み中…</b></div>';
   if(!list.length)return h+(allStudents().length?'<div class="empty"><b>条件に合う生徒がいません</b></div>':'<div class="empty"><b>まだ生徒が登録されていません</b><span>「＋ 生徒を追加」から、1人目を登録してください。</span></div>');
   h+='<div class="cards">'+list.map(s=>{
-    const cs=(s.courses||[]).map(c=>{const d=Math.min(courseDone(s,c),Number(c.koma)||0),k=Number(c.koma)||0;return '<span class="n" title="'+esc(c.name)+'">'+esc(c.name||'（講座名なし）')+'</span><span class="c">'+d+'/'+k+'</span><div class="meter"><i style="width:'+(k?d/k*100:0)+'%"></i></div>'}).join('');
+    const cs=(s.courses||[]).map(c=>{const d=Math.min(courseDone(s,c),Number(c.koma)||0),k=Number(c.koma)||0;return '<span class="n" title="'+esc(c.name)+'">'+esc(c.name||'（講座名なし）')+'</span><span class="c">'+d+'/'+k+'</span>'+(courseTestBadges(s,c)?'<span class="ctb">'+courseTestBadges(s,c)+'</span>':'')+'<div class="meter"><i style="width:'+(k?d/k*100:0)+'%"></i></div>'}).join('');
     const hs=sUnits(s).map(u=>{const c=Math.min(hmCleared(s,u),u.stages),p=hmPassed(s,u);return '<span class="n">'+u.name+(p?' <span class="badge">修得</span>':c>=u.stages?' <span class="badge warn">修了判定待ち</span>':'')+'</span><span class="c">'+c+'/'+u.stages+'</span><div class="meter hm"><i style="width:'+(c/u.stages*100)+'%"></i></div>'}).join('');
     const rt=rate(s);
     return '<div class="card'+(s.archived?' arch':'')+'"><div class="h">'+sname(s)+'<span class="grade">'+esc(s.grade)+(s.school?'・'+esc(s.school):'')+(s.archived?'・非表示':'')+'</span><button class="btn" data-act="edit" data-sid="'+s.id+'"'+(W()?'':' disabled')+'>編集</button></div>'+
@@ -1091,7 +1277,9 @@ function vEditor(){
     '<label class="field"><span>総コマ数</span><input id="e-ck-'+c.id+'" type="number" min="1" inputmode="numeric" data-c="'+i+'" data-k="koma" value="'+c.koma+'"></label>'+
     '<label class="field"><span>開始前の受講済み</span><input id="e-cb-'+c.id+'" type="number" min="0" inputmode="numeric" data-c="'+i+'" data-k="baseDone" value="'+(c.baseDone||0)+'"></label>'+
     '<button class="btn ghost" data-act="delcourse" data-i="'+i+'">外す</button>'+
-    '<label class="inline cfin"><input id="e-cf-'+c.id+'" type="checkbox" data-c="'+i+'" data-k="finished"'+(c.finished?' checked':'')+'> 修得済み</label><span class="rnote cfin" style="margin:0">科目：'+esc(subjectOf(c.name)||'未分類')+'</span></div>').join('')+
+    '<label class="inline cfin"><input id="e-cf-'+c.id+'" type="checkbox" data-c="'+i+'" data-k="finished"'+(c.finished?' checked':'')+'> 修得済み</label>'+
+    (Number(c.koma)>PART_SIZE?'<label class="inline cfin"><input id="e-cm-'+c.id+'" type="checkbox" data-c="'+i+'" data-k="midDone"'+(c.midDone?' checked':'')+'> 中間テスト済み</label>':'')+
+    '<label class="inline cfin"><input id="e-cfd-'+c.id+'" type="checkbox" data-c="'+i+'" data-k="finDone"'+(c.finDone?' checked':'')+'> 修了判定テスト合格済み</label><span class="rnote cfin" style="margin:0">科目：'+esc(subjectOf(c.name)||'未分類')+'</span></div>').join('')+
   '<div><button class="btn" data-act="addcourse">＋ 講座を追加</button></div>'+
   '<div class="sub-h">高マス（受講する単元にチェック。進み具合はアプリを使い始める前の状況）</div>'+
   UNITS.map(u=>{const on=!!e.hmUnits[u.id];return '<div class="hrow"><label class="inline"><input id="e-hu-'+u.id+'" type="checkbox" data-hu="'+u.id+'"'+(on?' checked':'')+'> <b>'+u.name+'</b></label>'+(on?'<label class="inline"><input id="e-hc-'+u.id+'" type="number" min="0" max="'+u.stages+'" inputmode="numeric" data-h="'+u.id+'" data-k="cleared" value="'+(e.hmBase[u.id]?.cleared||0)+'" style="width:64px" class="date"> / '+u.stages+' ステージ</label><label class="inline"><input id="e-hp-'+u.id+'" type="checkbox" data-h="'+u.id+'" data-k="passed"'+(e.hmBase[u.id]?.passed?' checked':'')+'> 修了判定 合格済み</label>':'<span class="none">受講しない</span>')+'</div>'}).join('')+
@@ -1128,7 +1316,7 @@ async function saveOrder(){
 async function saveStudent(){
   const e=S.editing;
   if(!e.name.trim()){S.editErr='名前を入力してください。';render();return}
-  const courses=e.courses.filter(c=>c.name.trim()).map(c=>({id:c.id,name:c.name.trim(),koma:Math.max(1,Math.round(Number(c.koma)||20)),baseDone:Math.max(0,Math.round(Number(c.baseDone)||0)),finished:!!c.finished}));
+  const courses=e.courses.filter(c=>c.name.trim()).map(c=>({id:c.id,name:c.name.trim(),koma:Math.max(1,Math.round(Number(c.koma)||20)),baseDone:Math.max(0,Math.round(Number(c.baseDone)||0)),finished:!!c.finished,midDone:!!c.midDone,finDone:!!c.finDone}));
   for(const c of courses)if(c.baseDone>c.koma){S.editErr='「'+c.name+'」の受講済みコマが総コマ数より多くなっています。';render();return}
   const hb={};UNITS.forEach(u=>{const x=e.hmBase[u.id]||{};hb[u.id]={cleared:Math.min(u.stages,Math.max(0,Math.round(Number(x.cleared)||0))),passed:!!x.passed}});
   const data={name:e.name.trim(),grade:e.grade,school:(e.school||'').trim(),memo:e.memo||'',archived:!!e.archived,courses,hmBase:hb,hmUnits:Object.fromEntries(UNITS.map(u=>[u.id,!!e.hmUnits[u.id]])),color:e.color||''};
@@ -1173,6 +1361,13 @@ document.addEventListener('click',ev=>{
     case 'reorder':rememberScroll();S.reorder=allStudents().filter(s=>!s.archived).map(s=>s.id);S.reorderErr='';render();window.scrollTo({top:0});break;
     case 'mv':{const i=Number(t.dataset.i),r=S.reorder,j=t.dataset.to==='top'?0:t.dataset.to==='end'?r.length-1:i+d;if(j<0||j>=r.length||j===i)break;const [x]=r.splice(i,1);r.splice(j,0,x);render();break}
     case 'rsave':saveOrder();break;
+    case 'schopen':rememberScroll();S.schoolEdit=true;S.schDraft={};render();window.scrollTo({top:0});break;
+    case 'schclose':S.schoolEdit=false;render();restoreScroll();break;
+    case 'schadd':{const id=t.dataset.sch;(S.schDraft[id]=S.schDraft[id]||[]).push({type:t.dataset.type,name:t.dataset.type==='test'?'定期テスト':'',start:'',end:''});render();break}
+    case 'schdel':{const a=S.schDraft[t.dataset.sch];if(a){a.splice(Number(t.dataset.ei),1);render()}break}
+    case 'schsave':saveSchool(t.dataset.sch,t.dataset.name);break;
+    case 'anarange':S.anaRange=t.dataset.r;render();break;
+    case 'anaai':runAnaAI();break;
     case 'impopen':{rememberScroll();S.impMsg='';S.imp={step:'pick',sid:'',files:[],sheets:[],err:'',paste:''};render();window.scrollTo({top:0});break}
     case 'impfdel':{const I=S.imp;if(I){const [f]=I.files.splice(Number(t.dataset.i),1);if(f)URL.revokeObjectURL(f.url);render()}break}
     case 'impread':runImport();break;
@@ -1192,6 +1387,7 @@ document.addEventListener('click',ev=>{
 document.addEventListener('change',ev=>{
   const t=ev.target;
   if(t.dataset.imp){impEdit(t);return}
+  if(t.dataset.sch){schEdit(t);render();return}
   if(t.dataset.impfile&&S.imp){impAddFiles(t.files);t.value='';return}
   if(t.id==='impSid'&&S.imp){S.imp.sid=t.value;render();return}
   if(t.id==='dDate'&&t.value){S.date=t.value;render()}
@@ -1205,8 +1401,9 @@ document.addEventListener('change',ev=>{
   else if(t.id==='wsDow'){const w=Number(t.value);S.settings={...S.settings,weekStartDow:w};S.planStart=weekStartFor(S.planStart||today());S.weekStart=null;writeDoc('settings/main',{weekStartDow:w},true);render()}
   else if(t.dataset.act==='ptime'){const {sid,date}=t.dataset;editPlan(date,sid,p=>{p.time=t.value})}
   else if(t.dataset.act==='pnum'){const {sid,date,kind,id}=t.dataset;const n=Math.max(0,Math.min(99,Math.round(Number(t.value)||0)));editPlan(date,sid,p=>{(kind==='c'?p.courses:p.hm)[id]=n;if(kind==='c'&&p.komas&&(p.komas[id]||[]).length>n)p.komas[id]=p.komas[id].slice(0,n)})}
+  else if(t.dataset.act==='ctest'){const {sid,id,kind}=t.dataset;editDay(sid,r=>{r.ctest=r.ctest||{};r.ctest[id]={...(r.ctest[id]||{}),[kind]:t.checked}})}
   else if(t.dataset.act==='final'){const {sid,id}=t.dataset;editDay(sid,r=>{r.final[id]=t.checked})}
-  else if(t.dataset.k==='finished'&&t.dataset.c!=null&&S.editing){S.editing.courses[Number(t.dataset.c)].finished=t.checked}
+  else if(['finished','midDone','finDone'].includes(t.dataset.k)&&t.dataset.c!=null&&S.editing){S.editing.courses[Number(t.dataset.c)][t.dataset.k]=t.checked}
   else if(t.dataset.hu&&S.editing){S.editing.hmUnits[t.dataset.hu]=t.checked;render()}
   else if(t.dataset.k==='passed'&&t.dataset.h&&S.editing){S.editing.hmBase[t.dataset.h].passed=t.checked}
   else if(t.dataset.f==='archived'&&S.editing){S.editing.archived=t.checked}
@@ -1215,6 +1412,7 @@ document.addEventListener('change',ev=>{
 document.addEventListener('input',ev=>{
   const t=ev.target;
   if(t.id==='impPaste'&&S.imp){S.imp.paste=t.value;return}
+  if(t.dataset.sch){schEdit(t);return}
   if(t.id==='q'){if(ev.isComposing)return;S.q=t.value.trim();render();return}
   if(!S.editing)return;
   if(t.dataset.f&&t.dataset.f!=='archived')S.editing[t.dataset.f]=t.value;
@@ -1264,7 +1462,15 @@ function parseJsonLoose(t){t=String(t||'').trim();try{return JSON.parse(t)}catch
   const m=t.match(/```(?:json)?\s*([\s\S]*?)```/);if(m){try{return JSON.parse(m[1])}catch(e){}}
   const a=t.indexOf('{'),b=t.lastIndexOf('}');if(a>=0&&b>a){try{return JSON.parse(t.slice(a,b+1))}catch(e){}}
   throw {code:'invalid_json'}}
-function makeReader(url){return {json:async(prompt,opt)=>{
+function makeReader(url){
+  const call=async(body,signal)=>{const u=firebase.auth().currentUser;if(!u)throw {code:'not_granted'};
+    let r;try{r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({idToken:await u.getIdToken(),...body}),signal})}
+    catch(e){throw {code:e&&e.name==='AbortError'?'cancelled':'upstream_error'}}
+    let j;try{j=await r.json()}catch(e){throw {code:'upstream_error'}}
+    if(j.error)throw {code:({auth:'not_granted',rate_limited:'rate_limited',refused:'refused',no_key:'sampling_disabled',bad_request:'bad_request'})[j.error]||'upstream_error'};
+    return j};
+  return {text:async(prompt)=>{const j=await call({mode:'text',prompt,images:[]});return String(j.text||'').trim()},
+  json:async(prompt,opt)=>{
   const u=firebase.auth().currentUser;if(!u)throw {code:'not_granted'};
   const idToken=await u.getIdToken();
   const images=await Promise.all([...(opt.images||[])].map(blobToB64));
@@ -1286,6 +1492,8 @@ function startData(fs){
   db.collection('students').onSnapshot(snap=>{const o={};snap.docs.forEach(d=>{o[d.id]={id:d.id,...clone(d.data())}});S.students=o;S.loaded.students=true;render()},onErr);
   db.collection('days').onSnapshot(snap=>{const o={};snap.docs.forEach(d=>{o[d.id]=d.data()});S.days=o;overlay('days');S.loaded.days=true;render()},onErr);
   db.collection('pdays').onSnapshot(snap=>{const o={};snap.docs.forEach(d=>{o[d.id]=d.data()});S.pdays=o;overlay('pdays');S.loaded.plans=true;render()},onErr);
+  db.collection('schools').onSnapshot(snap=>{const o={};snap.docs.forEach(d=>{o[d.id]=d.data()});S.schools=o;render()},onErr);
+  db.doc('settings/analysis').onSnapshot(d=>{S.anaAI=d.exists?d.data():null;render()},onErr);
   db.doc('settings/main').onSnapshot(d=>{if(d.exists){const w=d.data().weekStartDow;if(w!=null&&w!==S.settings.weekStartDow){S.settings={...S.settings,weekStartDow:w}}}render()},onErr);
 }
 (()=>{
