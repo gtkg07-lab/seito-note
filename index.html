@@ -1199,7 +1199,11 @@ function anaStudent(s,R){
       if(en>=from&&near<=R.b)causes.push((e.type==='test'?(e.start>R.b?'定期テストの前（':'定期テスト（'):'')+(e.name||EV_TYPES[e.type])+' '+evRange(e)+(e.type==='test'?'）':''))}}
   const cause=!alerts.length?'':causes.length?causes.join('、'):(ev.length?'不明（学校の予定とは重なっていない）':'不明（学校の予定が未登録）');
   const score=c.att*1+c.lec*2+c.ex*0.3+(pl.lec?Math.min(1.5,c.lec/pl.lec)*3:0);
-  return {s,c,p,pl,rt,lastAtt,lastLec,sinceAtt,sinceLec,pace,remain,eta:pace>0&&remain?Math.ceil(remain/pace):null,pend,alerts,cause,score};
+  let midLeft=0,midReady=0,finLeft=0,finReady=0;
+  for(const co of s.courses||[]){if(co.finished)continue;const k=Number(co.koma)||0,d=Math.min(courseDone(s,co),k);
+    if(hasMid(co)&&!midPassed(s,co)){midLeft++;if(d>=PART_SIZE)midReady++}
+    if(k&&!finPassed(s,co)){finLeft++;if(d>=k)finReady++}}
+  return {s,c,p,pl,rt,lastAtt,lastLec,sinceAtt,sinceLec,pace,remain,eta:pace>0&&remain?Math.ceil(remain/pace):null,pend,alerts,cause,score,midLeft,midReady,finLeft,finReady};
 }
 function anaPrompt(R,rows){
   const L=rows.map(x=>[x.s.name+'（'+x.s.grade+(schoolOf(x.s)?'・'+schoolOf(x.s):'')+'）',
@@ -1232,7 +1236,13 @@ function vAna(){
     '<div class="tile"><span class="k">1人あたりの受講（週）</span><span class="v">'+(T('lec','c')/n/weeks).toFixed(1)+'<small>コマ</small></span><span class="sub">前の期間 '+(T('lec','p')/n/weeks).toFixed(1)+' '+delta(T('lec','c'),T('lec','p'))+'</span></div>'+
     '<div class="tile"><span class="k">予定の達成率</span><span class="v">'+pct(T('lec','c'),PL('lec'))+'</span><span class="sub">受講 '+T('lec','c')+'/'+PL('lec')+'　登校 '+pct(T('att','c'),PL('att'))+'</span></div>'+
     '<div class="tile"><span class="k">高マス演習</span><span class="v">'+T('ex','c')+'<small>ステージ</small></span><span class="sub">前の期間 '+T('ex','p')+' '+delta(T('ex','c'),T('ex','p'))+'</span></div>'+
-    '<div class="tile"><span class="k">気になる生徒</span><span class="v">'+warn.length+'<small>名 / '+n+'名</small></span><span class="sub">下の「気になる生徒」を見てください</span></div></div>';
+    '<div class="tile"><span class="k">気になる生徒</span><span class="v">'+warn.length+'<small>名 / '+n+'名</small></span><span class="sub">下の「気になる生徒」を見てください</span></div></div>'+
+    // 全体でこれから残っているもの
+    (()=>{const S2=k=>rows.reduce((a,x)=>a+x[k],0),who=k=>rows.filter(x=>x[k]>0).length;
+      return '<h3 class="tph" style="margin-top:14px">これから残っているもの（表示中の'+n+'名の合計）</h3><div class="tiles">'+
+      '<div class="tile"><span class="k">残りの受講コマ数</span><span class="v">'+S2('remain')+'<small>コマ</small></span><span class="sub">1人あたり '+(S2('remain')/n).toFixed(1)+'コマ・'+who('remain')+'名に残りあり</span></div>'+
+      '<div class="tile"><span class="k">残りの中間テスト</span><span class="v">'+S2('midLeft')+'<small>回</small></span><span class="sub">うち今すぐ受けられる（10講まで終了） <b>'+S2('midReady')+'</b>回</span></div>'+
+      '<div class="tile"><span class="k">残りの修了判定テスト</span><span class="v">'+S2('finLeft')+'<small>回</small></span><span class="sub">うち今すぐ受けられる（全講終了） <b>'+S2('finReady')+'</b>回</span></div></div>'})();
   // AIのまとめ
   const ai=S.anaAI;
   h+='<section class="panel"><h3>AIのまとめ</h3>'+(ai?'<div class="aitext">'+esc(ai.text)+'</div><p class="note">作成：'+esc(String(ai.at).slice(0,16).replace('T',' '))+'（期間 '+esc(ai.range||'')+'）</p>':'<p class="none">まだ作られていません。</p>')+
