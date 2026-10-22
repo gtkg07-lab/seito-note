@@ -264,6 +264,8 @@ td.ttime{font-family:var(--f-num);font-weight:700;font-size:15px;color:var(--tod
 .anacard{border:1px solid var(--line);border-left:4px solid var(--bad);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:4px}
 .anacard .cause{font-size:12px;color:var(--ink-2)}
 .goodlist,.uplist{margin:0;padding-left:1.4em;display:flex;flex-direction:column;gap:4px;font-size:13px}
+.ravg{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;background:var(--accent-soft);border-radius:8px;padding:6px 10px;margin:0 0 6px;font-size:12px;color:var(--ink-2)}
+.ravg b{font-family:var(--f-num);font-size:18px;color:var(--accent)}
 .pk{font-size:10px;color:var(--accent);margin-top:2px;white-space:nowrap}
 .impprev{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
 .impthumb{max-width:220px;max-height:220px;border-radius:8px;border:1px solid var(--line);object-fit:contain;background:var(--sunk)}
@@ -1127,18 +1129,28 @@ function rankSections(list,P){
       s=>{if(!sUnits(s).includes(u))return -1;const c=Math.min(hmCleared(s,u,b),u.stages);return hmPassed(s,u,b)?0:c>=u.stages?1:c>0?2:3},
       s=>Math.min(hmCleared(s,u,b),u.stages),v=>v+'/'+u.stages,u.name+'を受講していない'));
   }
+  // 平均（受講・登校は1か月あたり、修了率は講座のある生徒の平均）
+  const cnt=list.length||1,days=dayDiff(a,b)+1,full=P.fullMonth;
+  const per=v=>full?v:v*30/days;
+  const tl=list.reduce((x,s)=>x+C[s.id].lec,0),ta=list.reduce((x,s)=>x+C[s.id].att,0);
+  const rs=list.filter(s=>R[s.id]).map(s=>R[s.id].r*100);
+  const basis=full?'この月':days+'日間を30日あたりに換算';
+  secs[0].avg={label:'月間平均受講コマ数',value:per(tl/cnt).toFixed(1)+'コマ',note:'1人あたり・'+basis};
+  secs[2].avg={label:'月間平均登校日数',value:per(ta/cnt).toFixed(1)+'日',note:'1人あたり・'+basis};
+  secs[3].avg={label:'平均受講修了率',value:rs.length?(rs.reduce((x,v)=>x+v,0)/rs.length).toFixed(1)+'%':'—',note:md(b)+' 時点・講座のある'+rs.length+'名の平均'};
   return secs;
 }
 function secHTML(x){
   const tot=x.bands.reduce((a,b)=>a+b.items.length,0);
   return '<div class="panel rank"><h3>'+esc(x.title)+'</h3><p class="rnote">'+esc(x.note)+'</p>'+
+    (x.avg?'<div class="ravg"><span>'+esc(x.avg.label)+'</span><b>'+esc(x.avg.value)+'</b><span class="of">'+esc(x.avg.note)+'</span></div>':'')+
     x.bands.map((b,i)=>{const c=b.items.length;
       return '<div class="band'+(c?'':' zero')+(i===0&&c?' top':'')+'"><span class="bl">'+esc(b.label)+'</span><div class="bc"><span class="btrack"><span class="bbar" style="width:'+(tot?c/tot*100:0)+'%"></span></span><span class="bn">'+c+'人</span></div>'+
         (c?'<div class="names">'+b.items.map(it=>'<span class="nchip">'+sname(it.s)+'<span class="of">'+esc(x.fmt(it.v))+'</span></span>').join('')+'</div>':'')+'</div>'}).join('')+
     (x.ex?'<p class="rnote" style="margin:8px 0 0">対象外 '+x.ex+'名（'+esc(x.exclLabel)+'）</p>':'')+'</div>';
 }
 function secText(x){
-  return '■'+x.title+'\n'+x.bands.map(b=>'・'+b.label+'：'+b.items.length+'人'+(b.items.length?'（'+b.items.map(it=>it.s.name+' '+x.fmt(it.v)).join('、')+'）':'')).join('\n')+(x.ex?'\n・対象外：'+x.ex+'名（'+x.exclLabel+'）':'');
+  return '■'+x.title+'\n'+(x.avg?'・'+x.avg.label+'：'+x.avg.value+'（'+x.avg.note+'）\n':'')+x.bands.map(b=>'・'+b.label+'：'+b.items.length+'人'+(b.items.length?'（'+b.items.map(it=>it.s.name+' '+x.fmt(it.v)).join('、')+'）':'')).join('\n')+(x.ex?'\n・対象外：'+x.ex+'名（'+x.exclLabel+'）':'');
 }
 function vRank(){
   const P=periodState(),list=visible();
