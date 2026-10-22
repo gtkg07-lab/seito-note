@@ -1137,20 +1137,21 @@ function rankSections(list,P){
   const basis=full?'この月':days+'日間を30日あたりに換算';
   secs[0].avg={label:'月間平均受講コマ数',value:per(tl/cnt).toFixed(1)+'コマ',note:'1人あたり・'+basis};
   secs[2].avg={label:'月間平均登校日数',value:per(ta/cnt).toFixed(1)+'日',note:'1人あたり・'+basis};
+  secs[2].avg2={label:'週の平均登校日数',value:(ta/cnt*7/days).toFixed(1)+'日',note:'1人あたり・'+days+'日間を7日あたりに換算'};
   secs[3].avg={label:'平均受講修了率',value:rs.length?(rs.reduce((x,v)=>x+v,0)/rs.length).toFixed(1)+'%':'—',note:md(b)+' 時点・講座のある'+rs.length+'名の平均'};
   return secs;
 }
 function secHTML(x){
   const tot=x.bands.reduce((a,b)=>a+b.items.length,0);
   return '<div class="panel rank"><h3>'+esc(x.title)+'</h3><p class="rnote">'+esc(x.note)+'</p>'+
-    (x.avg?'<div class="ravg"><span>'+esc(x.avg.label)+'</span><b>'+esc(x.avg.value)+'</b><span class="of">'+esc(x.avg.note)+'</span></div>':'')+
+    [x.avg,x.avg2].filter(Boolean).map(a=>'<div class="ravg"><span>'+esc(a.label)+'</span><b>'+esc(a.value)+'</b><span class="of">'+esc(a.note)+'</span></div>').join('')+
     x.bands.map((b,i)=>{const c=b.items.length;
       return '<div class="band'+(c?'':' zero')+(i===0&&c?' top':'')+'"><span class="bl">'+esc(b.label)+'</span><div class="bc"><span class="btrack"><span class="bbar" style="width:'+(tot?c/tot*100:0)+'%"></span></span><span class="bn">'+c+'人</span></div>'+
         (c?'<div class="names">'+b.items.map(it=>'<span class="nchip">'+sname(it.s)+'<span class="of">'+esc(x.fmt(it.v))+'</span></span>').join('')+'</div>':'')+'</div>'}).join('')+
     (x.ex?'<p class="rnote" style="margin:8px 0 0">対象外 '+x.ex+'名（'+esc(x.exclLabel)+'）</p>':'')+'</div>';
 }
 function secText(x){
-  return '■'+x.title+'\n'+(x.avg?'・'+x.avg.label+'：'+x.avg.value+'（'+x.avg.note+'）\n':'')+x.bands.map(b=>'・'+b.label+'：'+b.items.length+'人'+(b.items.length?'（'+b.items.map(it=>it.s.name+' '+x.fmt(it.v)).join('、')+'）':'')).join('\n')+(x.ex?'\n・対象外：'+x.ex+'名（'+x.exclLabel+'）':'');
+  return '■'+x.title+'\n'+[x.avg,x.avg2].filter(Boolean).map(a=>'・'+a.label+'：'+a.value+'（'+a.note+'）\n').join('')+x.bands.map(b=>'・'+b.label+'：'+b.items.length+'人'+(b.items.length?'（'+b.items.map(it=>it.s.name+' '+x.fmt(it.v)).join('、')+'）':'')).join('\n')+(x.ex?'\n・対象外：'+x.ex+'名（'+x.exclLabel+'）':'');
 }
 function vRank(){
   const P=periodState(),list=visible();
