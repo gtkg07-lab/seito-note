@@ -624,6 +624,8 @@ function ctestDone(s,c,kind,end,exceptDate){
 // 11講目を始めていれば、中間テストは終わっていると考える
 function midPassed(s,c,end,exceptDate){return !hasMid(c)||ctestDone(s,c,'mid',end,exceptDate)||maxKoma(s,c,end)>PART_SIZE}
 function finPassed(s,c,end,exceptDate){return ctestDone(s,c,'fin',end,exceptDate)}
+// 残りの受講コマ数（修得済み・全講終了の講座は除く。分析と同じ数え方）
+function remainKoma(s){let t=0;for(const c of s.courses||[]){if(courseFinished(s,c))continue;t+=Math.max(0,(Number(c.koma)||0)-courseDone(s,c))}return t}
 function courseTestBadges(s,c){const k=Number(c.koma)||0,d=Math.min(courseDone(s,c),k),out=[];
   if(hasMid(c)){if(midPassed(s,c))out.push('<span class="badge">中間✓</span>');else if(d>=PART_SIZE)out.push('<span class="badge warn">中間テスト待ち</span>')}
   if(finPassed(s,c))out.push('<span class="badge">修了判定 合格</span>');else if(k&&d>=k)out.push('<span class="badge warn">修了判定待ち</span>');
@@ -1284,7 +1286,7 @@ function vStudents(){
     const hs=sUnits(s).map(u=>{const c=Math.min(hmCleared(s,u),u.stages),p=hmPassed(s,u);return '<span class="n">'+u.name+(p?' <span class="badge">修得</span>':c>=u.stages?' <span class="badge warn">修了判定待ち</span>':'')+'</span><span class="c">'+c+'/'+u.stages+'</span><div class="meter hm"><i style="width:'+(c/u.stages*100)+'%"></i></div>'}).join('');
     const rt=rate(s);
     return '<div class="card'+(s.archived?' arch':'')+'"><div class="h">'+sname(s)+'<span class="grade">'+esc(s.grade)+(s.school?'・'+esc(s.school):'')+(s.archived?'・非表示':'')+'</span><button class="btn" data-act="edit" data-sid="'+s.id+'"'+(W()?'':' disabled')+'>編集</button></div>'+
-      '<div class="sub-h">受講　'+(rt?'修了率 '+pct(rt.r):'')+'</div><div class="prog">'+(cs||'<span class="none">講座が未登録です</span>')+'</div>'+
+      '<div class="sub-h">受講　'+(rt?'修了率 '+pct(rt.r)+'・'+(remainKoma(s)?'残り '+remainKoma(s)+'コマ':'残りなし'):'')+'</div><div class="prog">'+(cs||'<span class="none">講座が未登録です</span>')+'</div>'+
       '<div class="sub-h">高マス</div><div class="prog">'+(hs||'<span class="none">受講していません</span>')+'</div>'+(s.memo?'<div class="memo">'+esc(s.memo)+'</div>':'')+'</div>'}).join('')+'</div>';
   return h;
 }
