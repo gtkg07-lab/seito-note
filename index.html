@@ -268,6 +268,9 @@ td.ttime{font-family:var(--f-num);font-weight:700;font-size:15px;color:var(--tod
 .ravg b{font-family:var(--f-num);font-size:18px;color:var(--accent)}
 .noplan{display:flex;flex-wrap:wrap;gap:6px}
 .npchip{display:inline-flex;align-items:baseline;gap:6px;border:1px solid var(--line);border-left:3px solid var(--warn);border-radius:6px;padding:3px 8px;font-size:12px;background:var(--surface)}
+.pk.ptest{color:var(--warn);font-weight:700}
+.tchip.test{background:var(--warn-soft)}
+.tchip.test b{color:var(--warn)}
 .pk{font-size:10px;color:var(--accent);margin-top:2px;white-space:nowrap}
 .impprev{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
 .impthumb{max-width:220px;max-height:220px;border-radius:8px;border:1px solid var(--line);object-fit:contain;background:var(--sunk)}
@@ -697,25 +700,36 @@ function matchCourse(s,raw){const pre=normName(splitRaw(raw).prefix);if(!pre)ret
   for(const k in SUBJ_ABBR)if(SUBJ_ABBR[k].some(a=>normName(a)===pre)){const r=pick(open.filter(c=>subjectOf(c.name)===k));if(r)return r}
   return pick(byName)}
 const IMP_MAX=10;
-function courseInfo(s){return (s.courses||[]).map(c=>({id:c.id,name:c.name,subject:subjectOf(c.name)||'不明',finished:courseFinished(s,c),koma:Number(c.koma)||20}))}
+function courseInfo(s){return (s.courses||[]).map(c=>({id:c.id,name:c.name,subject:subjectOf(c.name)||'不明',finished:courseFinished(s,c),koma:Number(c.koma)||20,done:Math.min(courseDone(s,c),Number(c.koma)||20),midDone:midPassed(s,c),finDone:finPassed(s,c)}))}
 // s を渡すとその生徒用。null なら名簿から氏名で生徒を決めてもらう
 function impPrompt(s){
   const year=today().slice(0,4);
   const roster=s?null:allStudents().filter(x=>!x.archived).map(x=>({sid:x.id,name:x.name,grade:x.grade,courses:courseInfo(x),hm:sUnits(x).map(u=>u.id)}));
   return 'あなたは手書きの予定表を読み取る係です。画像は塾の生徒が書いた「予定表」の写真です。1枚目は紙全体、2枚目以降は同じ写真を半分に切った拡大用です（ない場合もあります）。紙は横向きや逆さまに写っていることがあります。\n\n'+
   '紙の構成：上に「氏名」欄と目標欄（目標欄は読まなくてよい）。表が2つあり、それぞれ7日分（合計14日）。各表の行は上から\n'+
-  '・日付（例「10/16(金)」。月が省略されて「19(月)」のように書かれることがある）\n・登校有無（「有・無」のどちらかに丸）\n・登校時間（例「17:00」）\n・受講（最大4行。例「C14」＝講座Cの第14講、「数2 10」＝数Ⅱの第10講、「英18」＝英語の講座の第18講）\n・高マス（例「単語3」＝単語を3ステージ）\n・確認欄（読まない）\n\n'+
+  '・日付（例「10/16(金)」。月が省略されて「19(月)」のように書かれることがある）\n・登校有無（「有・無」のどちらかに丸）\n・登校時間（例「17:00」）\n・受講（最大4行。例「C14」＝講座Cの第14講、「数2 10」＝数Ⅱの第10講、「英18」＝英語の講座の第18講。「C中間」「中間テスト」は講座の中間テスト（10講と11講の間）、「C修判」「修了判定」「修了判定テスト」は講座の修了判定テスト（最後の講のあと））\n・高マス（例「単語3」＝単語を3ステージ）\n・確認欄（読まない）\n\n'+
   '年は'+year+'年とする。月が省略された日付は前後の日付から補う。表の列は左から1日ずつ続く日付なので、最初に「10/19」と書いて次から「/20」「/21」のように月を省いて書く生徒がいる。このとき「/」が「1」に見えて「1/20」のように見えることがあるが、前の列が10/19なら次は10/20と読む。ただし月がはっきり書き分けてある場合（例：10/31 の次が 11/1）は、書いてある月を使う。days は紙の列の順（左上の表の左から、続けて下の表の左から）に並べる。日付が書かれていない列は出力しない。\n'+
   (s?'この生徒が登録している講座：'+JSON.stringify(courseInfo(s))+'\nこの生徒が受講している高マスの単元：'+JSON.stringify(sUnits(s).map(u=>({id:u.id,name:u.name})))+'（空なら高マスは出力しない）\n'
     :'生徒名簿（sid・氏名・学年・講座・受講している高マスの単元id）：'+JSON.stringify(roster)+'\n氏名欄の手書きの名前から、名簿の生徒を1人選んで sid に入れる。名字だけ・崩し字・似た字でも、名簿の中で最も当てはまる生徒を選ぶ。決められなければ sid は null。受講と高マスは、その生徒の講座・単元から選ぶ。高マスの単元id：tango=単語、jukugo=熟語、bunpo=文法。\n')+
   '受講は、講座一覧から最も当てはまるものの id を course に入れる。略記、全角と半角、「Ⅱ」「II」「2」の違い、「組」「講」の有無は同じものとみなす。「英18」「数10」のように科目名（英・英語・数・数学）だけで書かれた場合は、その科目（subject）の講座のうち finished が false のものを選ぶ（例：英語の講座がC組とD組で、D組が finished なら「英18」はC組の第18講）。どれか決められなければ course は null。koma は講の番号（数字）。講座は1〜10講が part1、11〜20講が part2 に分かれていて、「part2 2」「パート2の3」「p2-2」のように書かれていたら koma は (part−1)×10＋数字（part2 2 なら 12、part1 5 なら 5）。講座名がなく part だけ書いてあれば、受講中（finished が false）の講座が1つならそれを選ぶ。講座名だけで番号が書かれていなければ koma は null（受講することだけ分かればよい）。\n\n'+
-  'JSONだけで答える。形：\n{"name":"氏名欄の文字",'+(s?'':'"sid":"名簿のsid",')+'"days":[{"date":"'+year+'-10-16","dow":"金","attend":false,"time":"","lectures":[{"raw":"C14","course":"講座のid","koma":14}],"hm":[{"raw":"単語3","unit":"tango","stages":3}],"unsure":[]}]}\n'+
+  'JSONだけで答える。形：\n{"name":"氏名欄の文字",'+(s?'':'"sid":"名簿のsid",')+'"days":[{"date":"'+year+'-10-16","dow":"金","attend":false,"time":"","lectures":[{"raw":"C14","course":"講座のid","koma":14},{"raw":"C修判","course":"講座のid","test":"fin"}],"hm":[{"raw":"単語3","unit":"tango","stages":3}],"unsure":[]}]}\n'+
+  '受講の欄に中間テスト・修了判定テストが書いてあれば、lectures に test を付けて出す（中間テストは "mid"、修了判定テストは "fin"。koma は付けない）。講座名が書かれていなければ、講座一覧の done（済んだコマ数）を見て、中間なら done が10前後で midDone が false の講座、修判なら done が koma に近く finDone が false の講座を選ぶ。決められなければ course は null。\n'+
   'attend：「有」に丸→true、「無」に丸→false、どちらにも丸がない→null。time は "HH:MM"（24時間表記、書かれていなければ "" ／ 時間が書かれていないのは普通なので unsure にしない）。raw は紙に書かれた文字そのまま。読みにくい・自信がない項目は unsure に "date" "attend" "time" "lectures" "hm" のうち当てはまるものを入れる。';
 }
 // 読み取った氏名から生徒を決める（1人に決まらなければ ''）
 function matchStudent(name){const n=normName(name);if(!n)return '';const ss=allStudents().filter(x=>!x.archived);
   const eq=ss.filter(x=>normName(x.name)===n);if(eq.length===1)return eq[0].id;
   const part=ss.filter(x=>{const m=normName(x.name);return m&&(m.includes(n)||n.includes(m))});return part.length===1?part[0].id:''}
+// 受講の欄のテスト（中間テスト・修了判定テスト）を見分ける
+const TEST_RE=/中間テスト|中間|修了判定テスト|修了判定|修判/;
+function lecTest(l,raw){if(l&&(l.test==='mid'||l.test==='fin'))return l.test;const t=String(raw||'');if(/修了判定|修判/.test(t))return 'fin';if(/中間/.test(t))return 'mid';return ''}
+// テストの講座を決める：書いてある講座名 → なければ、そのテストを受ける段階の講座が1つならそれ
+function testCourse(s,test,raw){
+  const name=String(raw||'').replace(TEST_RE,'').replace(/テスト/g,'').trim();
+  if(name){const m=matchCourse(s,name+'1');if(m)return m}
+  const cs=(s.courses||[]).filter(c=>{if(c.finished)return false;const k=Number(c.koma)||0,d=Math.min(courseDone(s,c),k);
+    return test==='mid'?(hasMid(c)&&!midPassed(s,c)&&d>=PART_SIZE-2):(k&&!finPassed(s,c)&&d>=k-2)});
+  return cs.length===1?cs[0].id:''}
 function normImport(raw,s){
   const units=sUnits(s),seen=new Set(),days=[];
   // 列は1日ずつ続くので、日（何日）は合っているのに月だけ違う日付は、前の列の次の日に直す
@@ -736,6 +750,9 @@ function normImport(raw,s){
     let attend=d.attend;if(attend!==true&&attend!==false){attend=false;unsure.push('attend')}
     const tm=String(d.time||'').trim().match(/^(\d{1,2})[:：](\d{2})$/);const time=tm?pad(tm[1])+':'+tm[2]:'';
     const lectures=(Array.isArray(d.lectures)?d.lectures:[]).map(l=>{const rawTxt=String(l&&l.raw||'');
+      const test=lecTest(l,rawTxt);
+      if(test){const course=(s.courses||[]).some(c=>c.id===l.course)?l.course:testCourse(s,test,rawTxt);
+        if(!course)unsure.push('lectures');return {raw:rawTxt,course:course||'',koma:0,test}}
       const course=(s.courses||[]).some(c=>c.id===l.course)?l.course:matchCourse(s,rawTxt);
       const sp=splitRaw(rawTxt);
       const koma=Math.max(0,Math.round(sp.part?sp.koma:(Number(l.koma)||sp.koma||0)));
@@ -838,7 +855,8 @@ function vSheet(I,sh,si){
   h+='<div class="tablewrap" style="margin:0"><table class="imp"><thead><tr><th>取り込む</th><th class="l">日付</th><th class="l">登校</th><th class="l">時間</th><th class="l">受講</th>'+(units.length?'<th class="l">高マス</th>':'')+'</tr></thead><tbody>'+
   D.days.map((d,i)=>{const u=k=>d.unsure.includes(k)?' uns':'';const off=d.skip?' disabled':'';const at=' data-si="'+si+'" data-di="'+i+'"';
     const lec=d.lectures.map((l,j)=>{const bad=!l.course;return '<div class="lrow'+(bad?' uns':'')+'"><select data-imp="lcourse"'+at+' data-li="'+j+'" aria-label="講座"'+off+'><option value="">講座を選ぶ</option>'+(s.courses||[]).map(c=>'<option value="'+c.id+'"'+(c.id===l.course?' selected':'')+'>'+esc(c.name)+'</option>').join('')+'</select>'+
-      '<span class="rnote" style="margin:0">第</span><input type="number" min="1" max="99" inputmode="numeric" data-imp="lkoma"'+at+' data-li="'+j+'" value="'+(l.koma||'')+'" placeholder="未定" aria-label="講の番号（分からなければ空のまま）"'+off+'><span class="rnote" style="margin:0">講</span>'+
+      '<select data-imp="ltest"'+at+' data-li="'+j+'" aria-label="受講かテストか"'+off+'><option value="">受講</option><option value="mid"'+(l.test==='mid'?' selected':'')+'>中間テスト</option><option value="fin"'+(l.test==='fin'?' selected':'')+'>修了判定テスト</option></select>'+
+      (l.test?'':'<span class="rnote" style="margin:0">第</span><input type="number" min="1" max="99" inputmode="numeric" data-imp="lkoma"'+at+' data-li="'+j+'" value="'+(l.koma||'')+'" placeholder="未定" aria-label="講の番号（分からなければ空のまま）"'+off+'><span class="rnote" style="margin:0">講</span>')+
       (l.raw?'<span class="raw">紙：'+esc(l.raw)+'</span>':'')+'<button class="btn ghost xs" data-act="impldel"'+at+' data-li="'+j+'" aria-label="この受講を消す"'+off+'>×</button></div>'}).join('')+
       '<button class="btn ghost xs" data-act="impladd"'+at+off+'>＋ 受講</button>';
     const hm=units.map(un=>'<label class="inline hmi">'+un.name+'<input type="number" min="0" max="99" inputmode="numeric" data-imp="hm"'+at+' data-u="'+un.id+'" value="'+(d.hm[un.id]||'')+'" placeholder="0" aria-label="'+un.name+'のステージ数"'+off+'></label>').join('');
@@ -898,6 +916,7 @@ function impEdit(t){
   else if(f==='attend'){d.attend=t.checked;clear('attend');render()}
   else if(f==='time'){d.time=t.value;clear('time')}
   else if(f==='lcourse'&&l){l.course=t.value;render()}
+  else if(f==='ltest'&&l){l.test=t.value;if(l.test)l.koma=0;render()}
   else if(f==='lkoma'&&l){l.koma=Math.max(0,Math.round(Number(t.value)||0));render()}
   else if(f==='hm'){d.hm[t.dataset.u]=Math.max(0,Math.round(Number(t.value)||0));clear('hm')}
 }
@@ -909,8 +928,9 @@ async function saveSheet(sh){
     const old=prow(d.date,s.id)||{};
     // 上書き：前に入っていた講座・単元は 0 にしてから、紙の内容を入れる
     const r={attend:!!d.attend,time:d.attend?(d.time||''):'',courses:{},komas:{},hm:{}};
+    r.ctest={};for(const k in old.ctest||{})r.ctest[k]={mid:false,fin:false};
     for(const k in old.courses||{})r.courses[k]=0;for(const k in old.komas||{})r.komas[k]=[];for(const k in old.hm||{})r.hm[k]=0;
-    for(const l of d.lectures){r.courses[l.course]=(r.courses[l.course]||0)+1;if(l.koma)(r.komas[l.course]=r.komas[l.course]||[]).push(l.koma)}
+    for(const l of d.lectures){if(l.test){r.ctest[l.course]={...(r.ctest[l.course]||{}),[l.test]:true};continue}r.courses[l.course]=(r.courses[l.course]||0)+1;if(l.koma)(r.komas[l.course]=r.komas[l.course]||[]).push(l.koma)}
     for(const k in d.hm)r.hm[k]=d.hm[k]||0;
     const cur=clone(S.pdays[d.date]||{date:d.date,rows:{}});cur.rows=cur.rows||{};cur.rows[s.id]=r;S.pdays[d.date]=cur;
     if(!await writeDoc('pdays/'+d.date,{date:d.date,rows:{[s.id]:r}},true))return d.date;
@@ -942,9 +962,13 @@ async function saveImport(){
 // その日の予定から、受講（講の番号つき）と高マスの中身を短い文にする
 function planLec(s,p){const out=[];for(const c of s.courses||[]){const n=Number(p.courses?.[c.id])||0;if(!n)continue;
   const ks=(p.komas?.[c.id]||[]).filter(Boolean),un=n-ks.length;
-  out.push('<span class="tchip">'+esc(c.name)+' <b>'+[...ks.map(k=>'第'+k+'講'),...(un>0?[un>1?'講未定×'+un:'講未定']:[])].join('・')+'</b></span>')}return out}
+  out.push('<span class="tchip">'+esc(c.name)+' <b>'+[...ks.map(k=>'第'+k+'講'),...(un>0?[un>1?'講未定×'+un:'講未定']:[])].join('・')+'</b></span>')}
+  for(const t of planTests(p)){const c=(s.courses||[]).find(x=>x.id===t.id);if(c)out.push('<span class="tchip test">'+esc(c.name)+' <b>'+TEST_NAME[t.kind]+'</b></span>')}
+  return out}
 function planHm(s,p){return UNITS.filter(u=>Number(p.hm?.[u.id])>0).map(u=>'<span class="tchip hm">'+u.name+' <b>'+p.hm[u.id]+'</b>ステージ</span>')}
-function hasPlan(p){return !!p&&(p.attend||sumObj(p.courses)>0||sumObj(p.hm)>0)}
+function planTests(p){const out=[];for(const id in p&&p.ctest||{}){const t=p.ctest[id]||{};if(t.mid)out.push({id,kind:'mid'});if(t.fin)out.push({id,kind:'fin'})}return out}
+const TEST_NAME={mid:'中間テスト',fin:'修了判定テスト'};
+function hasPlan(p){return !!p&&(p.attend||sumObj(p.courses)>0||sumObj(p.hm)>0||planTests(p).length>0)}
 function vToday(list){
   const D=S.todayDate||today(),isT=D===today();
   const go=[],home=[];
@@ -994,7 +1018,8 @@ function vPlan(){
     const attRow='<tr><td class="l">登校</td>'+days.map((d,i)=>'<td'+TD(d)+'><button class="pa" data-act="patt" data-sid="'+s.id+'" data-date="'+d+'" aria-pressed="'+!!ps[i].attend+'" aria-label="'+fmtDay(d)+' 登校"'+dis+'>'+(ps[i].attend?'✓':'－')+'</button></td>').join('')+'<td class="num">'+t.att+'回</td></tr>';
     const timeRow='<tr><td class="l">登校時刻</td>'+days.map((d,i)=>'<td'+TD(d)+'>'+(ps[i].attend?'<input type="time" class="tm" id="tm-'+s.id+'-'+d+'" data-act="ptime" data-sid="'+s.id+'" data-date="'+d+'" value="'+esc(ps[i].time||'')+'" step="300" aria-label="'+fmtDay(d)+'の登校時刻"'+dis+'>'+(ps[i].time?'':'<div class="pk mute">時間未定</div>'):'')+'</td>').join('')+'<td></td></tr>';
     const numRow=(kind,id,label,note)=>{let tot=0;const cells=days.map((d,i)=>{const v=Number((kind==='c'?ps[i].courses:ps[i].hm)?.[id])||0;tot+=v;
-      return '<td'+TD(d)+'><input type="number" class="pn" min="0" max="99" inputmode="numeric" id="pn-'+kind+'-'+s.id+'-'+id+'-'+d+'" data-act="pnum" data-kind="'+kind+'" data-id="'+id+'" data-sid="'+s.id+'" data-date="'+d+'" value="'+(v||'')+'" placeholder="0" aria-label="'+esc(fmtDay(d)+' '+label)+'"'+dis+'>'+(kind==='c'&&v?(()=>{const ks=ps[i].komas?.[id]||[],un=v-ks.length;return '<div class="pk">'+ks.map(n=>'第'+n+'講').join(' ')+(un>0?'<span class="mute">'+(ks.length?' ＋':'')+'講未定'+(un>1?'×'+un:'')+'</span>':'')+'</div>'})():'')+'</td>'}).join('');
+      return '<td'+TD(d)+'><input type="number" class="pn" min="0" max="99" inputmode="numeric" id="pn-'+kind+'-'+s.id+'-'+id+'-'+d+'" data-act="pnum" data-kind="'+kind+'" data-id="'+id+'" data-sid="'+s.id+'" data-date="'+d+'" value="'+(v||'')+'" placeholder="0" aria-label="'+esc(fmtDay(d)+' '+label)+'"'+dis+'>'+(kind==='c'&&v?(()=>{const ks=ps[i].komas?.[id]||[],un=v-ks.length;return '<div class="pk">'+ks.map(n=>'第'+n+'講').join(' ')+(un>0?'<span class="mute">'+(ks.length?' ＋':'')+'講未定'+(un>1?'×'+un:'')+'</span>':'')+'</div>'})():'')+
+        (kind==='c'?planTests(ps[i]).filter(t=>t.id===id).map(t=>'<div class="pk ptest">'+(t.kind==='mid'?'中間テスト':'修判')+'</div>').join(''):'')+'</td>'}).join('');
       return '<tr><td class="l">'+esc(label)+' <span class="of">'+note+'</span></td>'+cells+'<td class="num">'+tot+'</td></tr>'};
     const cRows=(s.courses||[]).map(c=>numRow('c',c.id,'受講：'+c.name,'残'+Math.max(0,(Number(c.koma)||0)-courseDone(s,c)))).join('');
     const hRows=sUnits(s).map(u=>numRow('h',u.id,'高マス：'+u.name,'残'+Math.max(0,u.stages-hmCleared(s,u)))).join('');
