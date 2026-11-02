@@ -587,8 +587,10 @@ function vDaily(){
   if(!list.length)return h+emptyStudents();
   h+='<div class="list">'+groupByGrade(list,s=>{
     const r=row(D,s.id)||{};
-    const courses=(s.courses||[]).map(c=>komaInput(s,c,r,D)).join('')||'<span class="none">講座が未登録です</span>';
-    const hm=sUnits(s).map(u=>{const cur=Number(r.hm?.[u.id])||0;const all=hmCleared(s,u);const passedElse=hmPassed(s,u,null,D);
+    // 修了判定テストに合格した講座・高マスの単元は出さない（その日に記録がある場合や、その日に合格した場合は出す）
+    const showC=(s.courses||[]).filter(c=>!finPassed(s,c,null,D)||(Number(r.courses?.[c.id])||0)>0||r.ctest?.[c.id]?.fin);
+    const courses=showC.map(c=>komaInput(s,c,r,D)).join('')||'<span class="none">'+((s.courses||[]).length?'受講中の講座はありません（全講座 修了判定合格）':'講座が未登録です')+'</span>';
+    const hm=sUnits(s).filter(u=>!hmPassed(s,u,null,D)||(Number(r.hm?.[u.id])||0)>0||r.final?.[u.id]).map(u=>{const cur=Number(r.hm?.[u.id])||0;const all=hmCleared(s,u);const passedElse=hmPassed(s,u,null,D);
       let x=stepper('dh',s.id,u.id,cur,cur>0,all<u.stages,u.name,Math.min(all,u.stages)+'/'+u.stages);
       if(passedElse)x+='<span class="badge">'+u.name+' 修得済</span>';
       else if(all>=u.stages)x+='<label class="final"><input type="checkbox" data-act="final" data-sid="'+s.id+'" data-id="'+u.id+'"'+(r.final?.[u.id]?' checked':'')+(W()?'':' disabled')+'> '+u.name+' 修了判定に合格</label>';
