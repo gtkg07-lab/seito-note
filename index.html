@@ -100,13 +100,14 @@ h2{font-size:18px;margin:22px 0 4px;text-wrap:balance}
 .cols{display:flex;flex-direction:column;gap:8px;min-width:0}
 .lbl{font-size:11px;font-weight:700;color:var(--muted);width:44px;flex:none}
 .step{display:inline-flex;align-items:center;gap:6px;background:var(--sunk);border-radius:8px;padding:3px 4px 3px 10px;min-width:0}
-.step .nm{font-size:12px;color:var(--ink-2);max-width:12em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.step .nm{font-size:12px;color:var(--ink-2);white-space:normal;overflow-wrap:anywhere}
 .step button{width:28px;height:28px;border-radius:6px;border:1px solid var(--line);background:var(--surface);font-weight:700;line-height:1;padding:0}
 .step button:disabled{opacity:.35;cursor:not-allowed}
 .step output{min-width:1.6em;text-align:center;font-family:var(--f-num);font-weight:500}
 .step output.z{color:var(--muted)}
 .kgrp{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px;background:var(--sunk);border-radius:8px;padding:4px 6px 4px 10px;min-width:0}
-.kgrp .nm{font-size:12px;color:var(--ink-2);max-width:12em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 講座名は省略せず全部出す（長いときは折り返す） */
+.kgrp .nm{font-size:12px;color:var(--ink-2);white-space:normal;overflow-wrap:anywhere}
 .kgrp small{font-size:11px;color:var(--muted);font-family:var(--f-num)}
 .kc{display:inline-flex;align-items:center;gap:4px;background:var(--accent-soft);color:var(--accent);border-radius:6px;padding:2px 2px 2px 8px;font-size:12px;white-space:nowrap}
 .kc b{color:var(--warn)}
@@ -195,7 +196,7 @@ tfoot td{font-weight:700;background:var(--sunk);border-top:1px solid var(--line)
 .card .h b{font-size:15px;overflow-wrap:anywhere}
 .card .h .btn{margin-left:auto}
 .prog{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;font-size:12px;align-items:center}
-.prog .n{color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prog .n{color:var(--ink-2);white-space:normal;overflow-wrap:anywhere}
 .prog .c{font-family:var(--f-num);color:var(--muted)}
 .prog .meter{grid-column:1/-1;margin:0 0 4px}
 .rlist{display:flex;flex-direction:column;gap:4px;margin-top:8px}
@@ -282,7 +283,7 @@ table.imp td{vertical-align:top;text-align:left;white-space:normal}
 table.imp td.uns,.lrow.uns{background:var(--warn-soft)}
 table.imp tr.skip td{opacity:.45}
 table.imp input[type=number]{width:52px;border:1px solid var(--line);border-radius:6px;padding:3px 4px;background:var(--surface);font-family:var(--f-num)}
-table.imp select{border:1px solid var(--line);border-radius:6px;padding:3px 4px;background:var(--surface);max-width:9em;font-size:12px}
+table.imp select{border:1px solid var(--line);border-radius:6px;padding:3px 4px;background:var(--surface);max-width:18em;font-size:12px}
 .sheets{display:flex;flex-direction:column;gap:14px}
 .sheet{border:1px solid var(--line);border-radius:var(--r);padding:10px;display:flex;flex-direction:column;gap:10px}
 .sheet.skip{opacity:.55}
